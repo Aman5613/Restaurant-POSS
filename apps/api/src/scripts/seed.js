@@ -1,3 +1,4 @@
+import dns from 'node:dns';
 import mongoose from 'mongoose';
 import argon2 from 'argon2';
 import { env } from '../config/env.js';
@@ -6,6 +7,13 @@ import { ROLE_DEFINITIONS, ROLES } from '@pos/shared';
 
 async function seed() {
   console.info('🌱 Seeding database...');
+  if (env.MONGODB_URI?.startsWith('mongodb+srv://')) {
+    try {
+      dns.setServers(['8.8.8.8', '1.1.1.1']);
+    } catch (_e) {
+      // ignore
+    }
+  }
   await mongoose.connect(env.MONGODB_URI);
 
   // 1. Seed Roles
@@ -109,6 +117,34 @@ async function seed() {
     },
     { upsert: true, new: true }
   );
+
+  // 5. Seed standard tax slabs, payment modes, and numbering series
+  const outletService = new (await import('../modules/outlet/outlet.service.js')).OutletService();
+  await outletService.seedStandardSlabs(outlet._id);
+  console.info('✅ Standard GST slabs, payment modes, and numbering series seeded');
+
+  // 6. Seed Kitchen Stations & Floor Demo
+  const { KitchenStation } = await import('../models/index.js');
+  await KitchenStation.findOneAndUpdate(
+    { outlet_id: outlet._id, code: 'MK' },
+    { outlet_id: outlet._id, name: 'Main Kitchen', code: 'MK', active: true },
+    { upsert: true }
+  );
+  await KitchenStation.findOneAndUpdate(
+    { outlet_id: outlet._id, code: 'TG' },
+    { outlet_id: outlet._id, name: 'Tandoor & Grill', code: 'TG', active: true },
+    { upsert: true }
+  );
+  await KitchenStation.findOneAndUpdate(
+    { outlet_id: outlet._id, code: 'BAR' },
+    { outlet_id: outlet._id, name: 'Bar & Beverages', code: 'BAR', active: true },
+    { upsert: true }
+  );
+  console.info('✅ Kitchen stations seeded (Main Kitchen, Tandoor & Grill, Bar)');
+
+  const tablesService = new (await import('../modules/tables/tables.service.js')).TablesService();
+  await tablesService.seedDemoFloor(outlet._id);
+  console.info('✅ Demo areas and floor tables seeded');
 
   console.info('✅ Default users seeded');
   console.info('   Super Admin: 9999999999 / Admin@12345 (PIN: 1234)');

@@ -54,3 +54,21 @@ export const cancelOrderSchema = z.object({
   reason: z.string().min(3, 'Cancellation reason required'),
   managerOverrideToken: z.string().optional(),
 });
+
+export const addOrderLinesSchema = z.object({
+  items: z.array(orderLineSchema).min(1, 'At least one item required'),
+});
+
+export const updateOrderLineSchema = z.object({
+  quantity: z.number().int().positive().optional(),
+  notes: z.string().max(200).optional(),
+});
+
+export const cancelOrderLineSchema = z.object({
+  reason: z.string().min(2, 'Cancellation reason required'),
+  managerOverrideToken: z.string().optional(),
+});
+
+export const reprintKotSchema = z.object({
+  reason: z.string().min(2, 'Reprint reason required'),
+});

@@ -8,6 +8,8 @@ export function formatPaiseToRupees(paise) {
   return `₹${rupees}`;
 }
 
+export const formatCurrency = formatPaiseToRupees;
+
 /**
  * Normalizes Indian 10-digit mobile number, stripping spaces, dashes, +91, 0 prefix.
  */

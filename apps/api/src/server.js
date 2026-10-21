@@ -1,5 +1,14 @@
+import dns from 'node:dns';
 import { buildApp } from './app.js';
 import { env } from './config/env.js';
+
+if (env.MONGODB_URI?.startsWith('mongodb+srv://')) {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+  } catch (_e) {
+    // ignore
+  }
+}
 
 async function start() {
   const app = await buildApp();

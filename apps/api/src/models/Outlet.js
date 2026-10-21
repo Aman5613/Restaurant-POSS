@@ -17,8 +17,14 @@ const outletSchema = new mongoose.Schema(
       stateCode: { type: String, required: true }, // Indian GST State Code (e.g. "27")
       pincode: { type: String, required: true },
     },
+    logoUrl: { type: String },
+    isSetupCompleted: { type: Boolean, default: false },
     currency: { type: String, default: 'INR' },
     timezone: { type: String, default: 'Asia/Kolkata' },
+    operatingHours: {
+      openTime: { type: String, default: '09:00' },
+      closeTime: { type: String, default: '23:00' },
+    },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

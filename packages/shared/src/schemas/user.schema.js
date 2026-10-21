@@ -15,8 +15,15 @@ export const userCreateSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4 to 6 digits').optional(),
   outletId: z.string().optional(),
+  customPermissions: z.array(z.string()).default([]),
   maxDiscountPercent: z.number().min(0).max(100).default(0),
   isActive: z.boolean().default(true),
 });
 
 export const userUpdateSchema = userCreateSchema.partial();
+
+export const roleUpdateSchema = z.object({
+  name: z.string().min(2),
+  description: z.string().optional(),
+  permissions: z.array(z.string()),
+});

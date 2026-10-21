@@ -1,8 +1,9 @@
 import fastifyJwt from '@fastify/jwt';
 import fastifyCookie from '@fastify/cookie';
+import fp from 'fastify-plugin';
 import { env } from '../config/env.js';
 
-export async function jwtPlugin(fastify, _opts) {
+async function jwtPluginInner(fastify, _opts) {
   await fastify.register(fastifyCookie, {
     secret: env.COOKIE_SECRET,
   });
@@ -18,3 +19,5 @@ export async function jwtPlugin(fastify, _opts) {
     },
   });
 }
+
+export const jwtPlugin = fp(jwtPluginInner, { name: 'jwt-auth' });

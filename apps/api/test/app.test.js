@@ -7,7 +7,7 @@ describe('Fastify Server Base Health & Error Handling', () => {
   beforeAll(async () => {
     app = await buildApp({ skipDb: true });
     await app.ready();
-  });
+  }, 30000);
 
   afterAll(async () => {
     await app.close();

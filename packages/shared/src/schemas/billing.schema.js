@@ -41,3 +41,15 @@ export const voidBillSchema = z.object({
   reason: z.string().min(3, 'Void reason required'),
   managerOverrideToken: z.string().min(1, 'Manager override token required'),
 });
+
+export const splitBillSchema = z.object({
+  splitType: z.enum(['EQUAL', 'BY_ITEMS']),
+  splitCount: z.number().int().min(2).max(10).optional(),
+  subBills: z
+    .array(
+      z.object({
+        lineIds: z.array(z.string()).min(1),
+      })
+    )
+    .optional(),
+});

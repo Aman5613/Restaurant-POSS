@@ -6,3 +6,5 @@ export * from './events.js';
 export * from './billing/billing-engine.js';
 export * from './utils/formatters.js';
 export * from './schemas/index.js';
+export * from './printing/kot-formatter.js';
+export * from './printing/invoice-formatter.js';
