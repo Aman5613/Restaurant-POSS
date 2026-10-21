@@ -1,0 +1,27 @@
+{
+  "name": "@pos/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./*": "./src/*.js",
+    "./schemas": "./src/schemas/index.js",
+    "./billing": "./src/billing/billing-engine.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@pos/eslint-config": "workspace:*",
+    "eslint": "^9.21.0",
+    "fast-check": "^3.23.2",
+    "vitest": "^3.0.7"
+  }
+}
