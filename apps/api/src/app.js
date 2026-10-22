@@ -21,6 +21,9 @@ import { reportsRoutes } from './modules/reports/reports.routes.js';
 import { auditRoutes } from './modules/audit/audit.routes.js';
 import { syncRoutes } from './modules/sync/sync.routes.js';
 import { superAdminRoutes } from './modules/super-admin/super-admin.routes.js';
+import path from 'node:path';
+import fs from 'node:fs';
+import fastifyStatic from '@fastify/static';
 import { socketIoPlugin } from './plugins/socket.js';
 
 export async function buildApp(opts = {}) {
@@ -91,6 +94,33 @@ export async function buildApp(opts = {}) {
   await fastify.register(auditRoutes, { prefix: '/v1/audit-logs' });
   await fastify.register(syncRoutes, { prefix: '/v1/sync' });
   await fastify.register(superAdminRoutes, { prefix: '/v1/super-admin' });
+
+  // Serve static frontend SPA if built (e.g. in single-container deployment)
+  const webDistPath = path.resolve(process.cwd(), 'apps/web/dist');
+  if (fs.existsSync(webDistPath)) {
+    await fastify.register(fastifyStatic, {
+      root: webDistPath,
+      prefix: '/',
+      wildcard: false,
+    });
+
+    fastify.setNotFoundHandler((request, reply) => {
+      const url = request.raw.url || '';
+      if (
+        url.startsWith('/v1') ||
+        url.startsWith('/socket.io') ||
+        url.startsWith('/docs') ||
+        url.startsWith('/health')
+      ) {
+        return reply.status(404).send({
+          statusCode: 404,
+          error: 'Not Found',
+          message: `Route ${request.method}:${request.url} not found`,
+        });
+      }
+      return reply.sendFile('index.html');
+    });
+  }
 
   return fastify;
 }
