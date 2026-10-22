@@ -3,10 +3,14 @@ import { useAuthStore } from '../stores/auth-store';
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 async function request(endpoint, options = {}) {
-  const token = useAuthStore.getState().accessToken;
+  const authState = useAuthStore.getState();
+  const token = authState.accessToken;
+  const user = authState.user;
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    'x-outlet-id': user?.outletId || 'default-outlet',
     ...(options.headers || {}),
   };
 

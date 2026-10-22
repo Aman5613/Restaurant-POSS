@@ -47,6 +47,7 @@ export const itemSchema = z.object({
   isAvailable: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
   variants: z.array(itemVariantSchema).default([]),
+  addons: z.array(addonOptionSchema).default([]),
   addonGroupIds: z.array(z.string()).default([]),
 });
 

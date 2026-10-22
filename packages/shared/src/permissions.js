@@ -37,6 +37,8 @@ export const PERMISSIONS = {
   KOT_VIEW: 'kot.view',
   KOT_PRINT: 'kot.print',
   KOT_REPRINT: 'kot.reprint',
+  KOT_ACKNOWLEDGE: 'kot.acknowledge',
+  KOT_READY: 'kot.ready',
 
   // Billing & Payments
   BILL_VIEW: 'bill.view',

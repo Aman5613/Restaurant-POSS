@@ -6,6 +6,7 @@ export const ROLES = {
   MANAGER: 'manager',
   BILLER: 'biller',
   CAPTAIN: 'captain',
+  COOK: 'cook',
 };
 
 export const ROLE_DEFINITIONS = {
@@ -30,6 +31,7 @@ export const ROLE_DEFINITIONS = {
       PERMISSIONS.MENU_VIEW,
       PERMISSIONS.MENU_CREATE,
       PERMISSIONS.MENU_UPDATE,
+      PERMISSIONS.MENU_DELETE,
       PERMISSIONS.MENU_TOGGLE_AVAILABILITY,
       PERMISSIONS.TABLE_VIEW,
       PERMISSIONS.TABLE_MANAGE,
@@ -111,5 +113,16 @@ export const ROLE_DEFINITIONS = {
       PERMISSIONS.KOT_PRINT,
     ],
     level: 20,
+  },
+  [ROLES.COOK]: {
+    name: 'Kitchen Chef / Cook',
+    description: 'Kitchen display system, KOT acknowledgement, preparation and dispatch',
+    permissions: [
+      PERMISSIONS.KOT_VIEW,
+      PERMISSIONS.KOT_ACKNOWLEDGE,
+      PERMISSIONS.KOT_READY,
+      PERMISSIONS.MENU_VIEW,
+    ],
+    level: 30,
   },
 };

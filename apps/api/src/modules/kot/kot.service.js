@@ -83,4 +83,22 @@ export class KotService {
 
     return job;
   }
+
+  async acknowledgeKot({ outletId, kotId, acknowledgedBy }) {
+    const kot = await this.getKotById({ outletId, kotId });
+    kot.status = 'PREPARING';
+    kot.acknowledged_by = acknowledgedBy;
+    kot.acknowledged_at = new Date();
+    await kot.save();
+    return kot;
+  }
+
+  async markKotReady({ outletId, kotId, readyBy }) {
+    const kot = await this.getKotById({ outletId, kotId });
+    kot.status = 'READY';
+    kot.ready_by = readyBy;
+    kot.ready_at = new Date();
+    await kot.save();
+    return kot;
+  }
 }

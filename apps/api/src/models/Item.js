@@ -6,6 +6,12 @@ const itemVariantSchema = new mongoose.Schema({
   isAvailable: { type: Boolean, default: true },
 });
 
+const itemAddonSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  price: { type: Number, required: true, min: 0 }, // in paise
+  isAvailable: { type: Boolean, default: true },
+});
+
 const itemSchema = new mongoose.Schema(
   {
     outletId: { type: mongoose.Schema.Types.ObjectId, ref: 'Outlet', required: true, index: true },
@@ -20,6 +26,7 @@ const itemSchema = new mongoose.Schema(
     isAvailable: { type: Boolean, default: true, index: true },
     sortOrder: { type: Number, default: 0 },
     variants: [itemVariantSchema],
+    addons: [itemAddonSchema],
     addonGroupIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'AddonGroup' }],
   },
   { timestamps: true }

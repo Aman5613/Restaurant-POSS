@@ -18,6 +18,7 @@ const outletSchema = new mongoose.Schema(
       pincode: { type: String, required: true },
     },
     logoUrl: { type: String },
+    upiId: { type: String, trim: true },
     isSetupCompleted: { type: Boolean, default: false },
     currency: { type: String, default: 'INR' },
     timezone: { type: String, default: 'Asia/Kolkata' },

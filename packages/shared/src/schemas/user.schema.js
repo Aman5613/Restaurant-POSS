@@ -11,6 +11,7 @@ export const userCreateSchema = z.object({
     ROLES.MANAGER,
     ROLES.BILLER,
     ROLES.CAPTAIN,
+    ROLES.COOK,
   ]),
   password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4 to 6 digits').optional(),

@@ -24,11 +24,34 @@ export function formatInvoiceReceipt({
 
   // Header
   buffer.push(center(outlet.name || 'RESTAURANT POS'));
-  if (outlet.legal_name) buffer.push(center(outlet.legal_name));
-  if (outlet.address?.line1) buffer.push(center(`${outlet.address.line1}, ${outlet.address.city || ''}`));
+  const legalName = outlet.legalName || outlet.legal_name;
+  if (legalName) buffer.push(center(legalName));
+
+  const addrStr = typeof outlet.address === 'string'
+    ? outlet.address
+    : [
+        outlet.address?.line1,
+        outlet.address?.line2,
+        outlet.address?.city,
+        outlet.address?.state,
+        outlet.address?.pincode,
+      ]
+        .filter(Boolean)
+        .join(', ');
+  if (addrStr) buffer.push(center(addrStr));
+
   if (outlet.phone) buffer.push(center(`Ph: ${outlet.phone}`));
-  if (outlet.gstin) buffer.push(center(`GSTIN: ${outlet.gstin}`));
-  if (outlet.fssai) buffer.push(center(`FSSAI: ${outlet.fssai}`));
+  if (outlet.email) buffer.push(center(outlet.email));
+
+  const gstin = outlet.gstin;
+  const fssai = outlet.fssaiNumber || outlet.fssai;
+  if (gstin || fssai) {
+    const taxLine = [gstin ? `GSTIN: ${gstin}` : '', fssai ? `FSSAI: ${fssai}` : '']
+      .filter(Boolean)
+      .join(' | ');
+    buffer.push(center(taxLine));
+  }
+  if (outlet.upiId) buffer.push(center(`UPI: ${outlet.upiId}`));
 
   buffer.push(doubleHr);
   buffer.push(center('TAX INVOICE'));
@@ -44,10 +67,14 @@ export function formatInvoiceReceipt({
   buffer.push(hr);
 
   for (const line of lines) {
-    const qty = `${line.quantity}x`.padEnd(5);
-    const name = (line.name.length > 20 ? line.name.substring(0, 19) + '.' : line.name).padEnd(21);
-    const unit = `₹${formatPaiseToRupees(line.unit_price)}`.padStart(7);
-    const amt = `₹${formatPaiseToRupees(line.total_amount || line.gross_amount)}`.padStart(9);
+    const qtyVal = line.quantity ?? line.qty ?? 1;
+    const qty = `${qtyVal}x`.padEnd(5);
+    const lineName = line.name || 'Item';
+    const name = (lineName.length > 20 ? lineName.substring(0, 19) + '.' : lineName).padEnd(21);
+    const unitPriceVal = line.unit_price ?? line.price ?? 0;
+    const unit = `₹${formatPaiseToRupees(unitPriceVal)}`.padStart(7);
+    const amtVal = line.total_amount ?? line.total ?? line.gross_amount ?? (unitPriceVal * qtyVal);
+    const amt = `₹${formatPaiseToRupees(amtVal)}`.padStart(9);
 
     buffer.push(`${qty}${name}${unit}${amt}`);
   }

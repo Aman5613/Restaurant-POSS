@@ -13,4 +13,6 @@ export async function kotRoutes(fastify, _opts) {
   fastify.post('/:id/reprint', { preHandler: [authorize({ permission: PERMISSIONS.KOT_REPRINT })] }, controller.reprint.bind(controller));
   fastify.get('/print-jobs', { preHandler: [authorize({ permission: PERMISSIONS.KOT_VIEW })] }, controller.listPrintJobs.bind(controller));
   fastify.post('/print-jobs/:id/retry', { preHandler: [authorize({ permission: PERMISSIONS.KOT_PRINT })] }, controller.retryPrintJob.bind(controller));
+  fastify.post('/:id/acknowledge', { preHandler: [authorize({ permission: PERMISSIONS.KOT_ACKNOWLEDGE })] }, controller.acknowledge.bind(controller));
+  fastify.post('/:id/ready', { preHandler: [authorize({ permission: PERMISSIONS.KOT_READY })] }, controller.markReady.bind(controller));
 }

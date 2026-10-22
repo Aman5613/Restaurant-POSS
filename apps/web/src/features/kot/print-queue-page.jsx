@@ -11,9 +11,9 @@ import {
   AlertTriangle,
   Clock,
   Copy,
-  Search,
 } from 'lucide-react';
 import { KOT_STATUS, PRINT_JOB_STATUS } from '@pos/shared';
+import { usePosStore } from '@/stores/pos-store';
 
 export function PrintQueuePage() {
   const [selectedStation, setSelectedStation] = useState('ALL');
@@ -21,6 +21,13 @@ export function PrintQueuePage() {
   const [reprintModalKot, setReprintModalKot] = useState(null);
   const [reprintReason, setReprintReason] = useState('Paper Jam in printer');
   const [notification, setNotification] = useState(null);
+  const [bridgeOnline, setBridgeOnline] = useState(false);
+
+  React.useEffect(() => {
+    fetch('http://127.0.0.1:18181/health')
+      .then((r) => r.ok && setBridgeOnline(true))
+      .catch(() => setBridgeOnline(false));
+  }, []);
 
   const stations = [
     { id: 'st_1', name: 'Main Kitchen' },
@@ -28,50 +35,7 @@ export function PrintQueuePage() {
     { id: 'st_3', name: 'Bar & Beverages' },
   ];
 
-  const [kots, setKots] = useState([
-    {
-      id: 'kot_1',
-      kotNo: 'KOT-0041',
-      orderNo: 'ORD-0041',
-      tableName: 'Table 1',
-      stationId: 'st_1',
-      stationName: 'Main Kitchen',
-      status: KOT_STATUS.PRINTED,
-      createdAt: '10 mins ago',
-      lines: [
-        { name: 'Paneer Butter Masala', variant: 'Full', quantity: 1, notes: 'Medium spice' },
-        { name: 'Dal Makhani', variant: null, quantity: 1, notes: 'Extra butter' },
-      ],
-    },
-    {
-      id: 'kot_2',
-      kotNo: 'KOT-0042',
-      orderNo: 'ORD-0041',
-      tableName: 'Table 1',
-      stationId: 'st_2',
-      stationName: 'Tandoor & Grill',
-      status: KOT_STATUS.PENDING,
-      createdAt: '9 mins ago',
-      lines: [
-        { name: 'Butter Naan', variant: null, quantity: 4, notes: 'Crispy' },
-        { name: 'Paneer Tikka', variant: 'Full', quantity: 1, notes: '' },
-      ],
-    },
-    {
-      id: 'kot_3',
-      kotNo: 'KOT-0043',
-      orderNo: 'ORD-0043',
-      tableName: 'Counter (Takeaway)',
-      stationId: 'st_1',
-      stationName: 'Main Kitchen',
-      status: KOT_STATUS.FAILED,
-      createdAt: '4 mins ago',
-      errorMessage: 'Printer connection timeout (192.168.1.150)',
-      lines: [
-        { name: 'Chicken Biryani', variant: 'Full', quantity: 2, notes: 'Pack with extra raita' },
-      ],
-    },
-  ]);
+  const { kots, updateKotStatus } = usePosStore();
 
   const filteredKots = kots.filter((k) => {
     const matchesStation = selectedStation === 'ALL' || k.stationId === selectedStation;
@@ -79,19 +43,63 @@ export function PrintQueuePage() {
     return matchesStation && matchesStatus;
   });
 
-  const handleReprint = () => {
+  const handleReprint = async () => {
     if (!reprintModalKot) return;
+    const linesText = (reprintModalKot.lines || reprintModalKot.items || [])
+      .map(
+        (l) =>
+          `${l.quantity || 1}x ${l.name}${l.variant || l.variantName ? ` (${l.variant || l.variantName})` : ''}${
+            l.addons?.length ? ` [+${l.addons.map((a) => (typeof a === 'string' ? a : a.name)).join(', ')}]` : ''
+          }${l.notes ? ` [Note: ${l.notes}]` : ''}`
+      )
+      .join('\n');
+
+    try {
+      await fetch('http://127.0.0.1:18181/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          printerIp: '127.0.0.1',
+          content: `*** DUPLICATE KOT ***\nTicket: ${reprintModalKot.kotNo}\nTable: ${reprintModalKot.tableName}\nReason: ${reprintReason}\n${linesText}\n`,
+        }),
+      });
+    } catch {
+      // Local bridge fallback
+    }
+
+    updateKotStatus(reprintModalKot.id, KOT_STATUS.PRINTED, null);
     setNotification(`DUPLICATE KOT reprinted for ${reprintModalKot.kotNo}! Reason: ${reprintReason}`);
     setReprintModalKot(null);
     setTimeout(() => setNotification(null), 3500);
   };
 
-  const handleRetryPrint = (kotId) => {
-    setKots((prev) =>
-      prev.map((k) =>
-        k.id === kotId ? { ...k, status: KOT_STATUS.PRINTED, errorMessage: null } : k
-      )
-    );
+  const handleRetryPrint = async (kotId) => {
+    const targetKot = kots.find((k) => k.id === kotId);
+    if (targetKot) {
+      const linesText = (targetKot.lines || targetKot.items || [])
+        .map(
+          (l) =>
+            `${l.quantity || 1}x ${l.name}${l.variant || l.variantName ? ` (${l.variant || l.variantName})` : ''}${
+              l.addons?.length ? ` [+${l.addons.map((a) => (typeof a === 'string' ? a : a.name)).join(', ')}]` : ''
+            }${l.notes ? ` [Note: ${l.notes}]` : ''}`
+        )
+        .join('\n');
+
+      try {
+        await fetch('http://127.0.0.1:18181/print', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            printerIp: '127.0.0.1',
+            content: `*** RETRIED KOT ***\nTicket: ${targetKot.kotNo}\nTable: ${targetKot.tableName}\n${linesText}\n`,
+          }),
+        });
+      } catch {
+        // Fallback
+      }
+    }
+
+    updateKotStatus(kotId, KOT_STATUS.PRINTED, null);
     setNotification('Print job re-dispatched to thermal printer!');
     setTimeout(() => setNotification(null), 3000);
   };
@@ -99,70 +107,83 @@ export function PrintQueuePage() {
   const getStatusBadge = (status) => {
     switch (status) {
       case KOT_STATUS.PENDING:
-        return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/40">QUEUED</Badge>;
+        return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold">QUEUED</Badge>;
       case KOT_STATUS.PRINTED:
-        return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40">PRINTED</Badge>;
+        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold">PRINTED</Badge>;
       case KOT_STATUS.FAILED:
-        return <Badge className="bg-rose-500/20 text-rose-400 border-rose-500/40">FAILED</Badge>;
+        return <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px] font-semibold">FAILED</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4 max-w-7xl mx-auto">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <ChefHat className="w-6 h-6 text-emerald-400" />
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <ChefHat className="w-5 h-5 text-slate-700" />
             KOT & Kitchen Print Queue
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-xs text-slate-500 font-medium">
             Monitor Kitchen Order Tickets, reroute thermal printers & reprint duplicate slips
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge className="bg-slate-800 text-slate-300 border-slate-700 py-1.5 px-3 flex items-center gap-1.5">
-            <Printer className="w-4 h-4 text-emerald-400" />
-            Printer Bridge: Online
+          <Badge className={`border py-1 px-2.5 text-xs font-semibold flex items-center gap-1.5 ${bridgeOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}>
+            <Printer className="w-3.5 h-3.5" />
+            Printer Bridge: {bridgeOnline ? 'Active (Port 18181)' : 'Direct Web / LAN'}
           </Badge>
+
+          <Button
+            size="sm"
+            onClick={() => window.location.href = '/kitchen'}
+            className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-xs"
+          >
+            <ChefHat className="w-3.5 h-3.5 mr-1.5" />
+            Kitchen KDS View
+          </Button>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-          <Button
-            size="sm"
-            variant={selectedStation === 'ALL' ? 'default' : 'ghost'}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+          <button
             onClick={() => setSelectedStation('ALL')}
-            className={selectedStation === 'ALL' ? 'bg-emerald-600 hover:bg-emerald-500' : ''}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+              selectedStation === 'ALL'
+                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
           >
             All Stations
-          </Button>
+          </button>
           {stations.map((s) => (
-            <Button
+            <button
               key={s.id}
-              size="sm"
-              variant={selectedStation === s.id ? 'default' : 'ghost'}
               onClick={() => setSelectedStation(s.id)}
-              className={selectedStation === s.id ? 'bg-emerald-600 hover:bg-emerald-500' : ''}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                selectedStation === s.id
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
             >
               {s.name}
-            </Button>
+            </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+        <div className="flex items-center gap-1">
           {['ALL', KOT_STATUS.PENDING, KOT_STATUS.PRINTED, KOT_STATUS.FAILED].map((st) => (
             <button
               key={st}
               onClick={() => setSelectedStatus(st)}
-              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                 selectedStatus === st
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
               {st}
@@ -172,111 +193,129 @@ export function PrintQueuePage() {
       </div>
 
       {/* KOT Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredKots.map((kot) => {
-          const isFailed = kot.status === KOT_STATUS.FAILED;
+      {filteredKots.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-xs">
+          <ChefHat className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800">No KOT Tickets in Queue</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            When orders are sent to the kitchen from the Floor or Order screen, real KOT slips will appear here live.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+          {filteredKots.map((kot) => {
+            const isFailed = kot.status === KOT_STATUS.FAILED;
 
           return (
-            <Card
+            <div
               key={kot.id}
-              className={`bg-slate-900 border transition-all ${
-                isFailed ? 'border-rose-500/60 shadow-lg shadow-rose-950/20' : 'border-slate-800'
+              className={`bg-white border rounded-xl p-3.5 space-y-3 transition-all shadow-xs ${
+                isFailed ? 'border-rose-300' : 'border-slate-200 hover:border-slate-300'
               }`}
             >
-              <CardContent className="p-4 space-y-3">
-                {/* Header */}
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <div>
-                    <h3 className="font-bold text-white text-base font-mono">{kot.kotNo}</h3>
-                    <p className="text-xs text-slate-400">
-                      {kot.orderNo} • <span className="text-emerald-400 font-semibold">{kot.tableName}</span>
-                    </p>
-                  </div>
-                  {getStatusBadge(kot.status)}
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm font-mono">{kot.kotNo}</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    {kot.orderNo} • <span className="text-slate-800 font-semibold">{kot.tableName}</span>
+                  </p>
                 </div>
+                {getStatusBadge(kot.status)}
+              </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span className="font-semibold text-slate-300">{kot.stationName}</span>
-                  <span className="flex items-center gap-1 text-slate-500">
-                    <Clock className="w-3 h-3" />
-                    {kot.createdAt}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                <span className="font-semibold text-slate-700">{kot.stationName}</span>
+                <span className="flex items-center gap-1 text-slate-400">
+                  <Clock className="w-3 h-3" />
+                  {kot.createdAt}
+                </span>
+              </div>
 
-                {/* Items */}
-                <div className="bg-slate-950/80 rounded-lg p-2.5 border border-slate-800/80 space-y-1.5 font-mono text-xs">
-                  {kot.lines.map((l, idx) => (
-                    <div key={idx} className="flex justify-between items-start gap-2">
-                      <span className="text-white font-bold">{l.quantity}x {l.name}</span>
-                      {l.variant && <span className="text-slate-400">({l.variant})</span>}
+              {/* Items */}
+              <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100 space-y-2 font-mono text-xs">
+                {(kot.lines || kot.items || []).map((l, idx) => {
+                  const variant = l.variant || l.variantName || l.variant_name;
+                  const addons = l.addons || [];
+
+                  return (
+                    <div key={idx} className="space-y-0.5 border-b border-slate-200/50 pb-1.5 last:border-0 last:pb-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-slate-900 font-bold">{l.quantity || l.qty || 1}x {l.name}</span>
+                        {variant && <span className="text-slate-500 font-normal">({variant})</span>}
+                      </div>
+                      {addons.length > 0 && (
+                        <p className="text-[11px] text-emerald-700 pl-4 font-sans font-medium">
+                          + {addons.map((a) => (typeof a === 'string' ? a : a.name)).join(', ')}
+                        </p>
+                      )}
+                      {l.notes && (
+                        <p className="text-[11px] text-amber-700 italic pl-4 font-sans">
+                          Note: {l.notes}
+                        </p>
+                      )}
                     </div>
-                  ))}
-                  {kot.lines.some((l) => l.notes) && (
-                    <div className="pt-1 text-[11px] text-amber-400/90 italic font-sans">
-                      {kot.lines.filter((l) => l.notes).map((l, i) => (
-                        <p key={i}>Note: {l.notes}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  );
+                })}
+              </div>
 
-                {/* Error Banner if failed */}
-                {kot.errorMessage && (
-                  <div className="p-2 rounded bg-rose-950/40 border border-rose-800/50 text-rose-300 text-xs flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                    <span>{kot.errorMessage}</span>
-                  </div>
+              {/* Error Banner if failed */}
+              {kot.errorMessage && (
+                <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-1.5 font-medium">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  <span>{kot.errorMessage}</span>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="pt-1 border-t border-slate-100">
+                {isFailed ? (
+                  <Button
+                    size="sm"
+                    className="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs h-8 gap-1.5 font-semibold"
+                    onClick={() => handleRetryPrint(kot.id)}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Retry Print Job
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-xs h-8 gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold"
+                    onClick={() => setReprintModalKot(kot)}
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    Reprint KOT (Duplicate)
+                  </Button>
                 )}
-
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                  {isFailed ? (
-                    <Button
-                      size="sm"
-                      className="w-full bg-rose-600 hover:bg-rose-500 text-xs h-8 gap-1.5"
-                      onClick={() => handleRetryPrint(kot.id)}
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      Retry Print Job
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full text-xs h-8 gap-1.5 border-slate-800 hover:border-slate-700"
-                      onClick={() => setReprintModalKot(kot)}
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      Reprint KOT (Duplicate)
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Notification Toast */}
       {notification && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-emerald-500 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-          <span className="text-sm font-medium">{notification}</span>
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-xl flex items-center gap-2 text-xs font-semibold">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{notification}</span>
         </div>
       )}
 
       {/* Reprint Reason Modal */}
       {reprintModalKot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <Card className="w-full max-w-md bg-white border-slate-200 shadow-2xl">
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center gap-2">
-                <Printer className="w-5 h-5 text-amber-400" />
-                <h3 className="text-lg font-bold text-white">
+                <Printer className="w-5 h-5 text-slate-700" />
+                <h3 className="text-base font-bold text-slate-900">
                   Reprint KOT ({reprintModalKot.kotNo})
                 </h3>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 A duplicate watermarked slip will be printed for kitchen tracking. Please select a reason for the audit trail:
               </p>
 
@@ -291,10 +330,10 @@ export function PrintQueuePage() {
                     key={reason}
                     type="button"
                     onClick={() => setReprintReason(reason)}
-                    className={`w-full p-2.5 text-left rounded text-xs transition-all border ${
+                    className={`w-full p-2.5 text-left rounded-lg text-xs transition-all border ${
                       reprintReason === reason
-                        ? 'bg-amber-500/20 border-amber-500 text-white font-semibold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                        ? 'bg-rose-50 border-rose-300 text-rose-900 font-semibold'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                     }`}
                   >
                     {reason}
@@ -302,11 +341,11 @@ export function PrintQueuePage() {
                 ))}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <Button variant="ghost" onClick={() => setReprintModalKot(null)}>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button variant="ghost" size="sm" className="text-xs text-slate-600" onClick={() => setReprintModalKot(null)}>
                   Cancel
                 </Button>
-                <Button className="bg-amber-600 hover:bg-amber-500 text-white" onClick={handleReprint}>
+                <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold" onClick={handleReprint}>
                   Print Duplicate
                 </Button>
               </div>

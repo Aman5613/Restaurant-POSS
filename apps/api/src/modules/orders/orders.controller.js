@@ -14,12 +14,16 @@ export class OrdersController {
 
   async create(req, reply) {
     const validated = createOrderSchema.parse(req.body);
+    const outletId = req.user.outlet_id || validated.outletId;
     const order = await this.service.createOrder({
-      outletId: req.user.outlet_id || validated.outletId,
+      outletId,
       tenantId: req.user.tenant_id,
       waiterId: req.user.sub || req.user.id,
       ...validated,
     });
+    if (req.server?.emitOutlet) {
+      req.server.emitOutlet(outletId, 'order:created', order);
+    }
     return reply.status(201).send({ success: true, data: order });
   }
 
@@ -79,6 +83,12 @@ export class OrdersController {
       orderId: req.params.id,
       createdBy: req.user.sub || req.user.id,
     });
+    if (req.server?.emitOutlet) {
+      req.server.emitOutlet(outletId, 'kot:dispatched', result);
+    }
+    if (req.server?.emitKitchen) {
+      req.server.emitKitchen(outletId, 'kot:dispatched', result);
+    }
     return reply.send({ success: true, data: result });
   }
 

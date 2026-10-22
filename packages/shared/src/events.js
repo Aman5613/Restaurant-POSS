@@ -29,3 +29,24 @@ export const AUDIT_EVENTS = {
   CASH_PAY_IN: 'CASH_PAY_IN',
   CASH_PAY_OUT: 'CASH_PAY_OUT',
 };
+
+export const SOCKET_EVENTS = {
+  // Rooms & Connection
+  JOIN_OUTLET: 'join:outlet',
+  LEAVE_OUTLET: 'leave:outlet',
+
+  // Order & KOT Flow
+  ORDER_CREATED: 'order:created',
+  ORDER_UPDATED: 'order:updated',
+  KOT_DISPATCHED: 'kot:dispatched',
+  KOT_ACKNOWLEDGE: 'kot:acknowledge',
+  KOT_ACKNOWLEDGED: 'kot:acknowledged',
+  KOT_READY: 'kot:ready',
+
+  // Floor & Billing
+  TABLE_UPDATED: 'table:updated',
+  BILL_SETTLED: 'bill:settled',
+
+  // Catalog
+  ITEM_86_TOGGLED: 'item:86_toggled',
+};

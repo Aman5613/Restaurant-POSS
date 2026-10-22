@@ -48,4 +48,33 @@ export class KotController {
     });
     return reply.send({ success: true, data: job });
   }
+
+  async acknowledge(req, reply) {
+    const outletId = req.user.outlet_id;
+    const kot = await this.service.acknowledgeKot({
+      outletId,
+      kotId: req.params.id,
+      acknowledgedBy: req.user.sub || req.user.id,
+    });
+    if (req.server?.emitOutlet) {
+      req.server.emitOutlet(outletId, 'kot:acknowledged', { kotId: req.params.id, kot });
+    }
+    return reply.send({ success: true, data: kot });
+  }
+
+  async markReady(req, reply) {
+    const outletId = req.user.outlet_id;
+    const kot = await this.service.markKotReady({
+      outletId,
+      kotId: req.params.id,
+      readyBy: req.user.sub || req.user.id,
+    });
+    if (req.server?.emitOutlet) {
+      req.server.emitOutlet(outletId, 'kot:ready', { kotId: req.params.id, kot });
+    }
+    if (req.server?.emitService) {
+      req.server.emitService(outletId, 'kot:ready', { kotId: req.params.id, kot });
+    }
+    return reply.send({ success: true, data: kot });
+  }
 }

@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Receipt,
-  IndianRupee,
   CreditCard,
   QrCode,
   Banknote,
@@ -18,26 +18,60 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  UserCheck,
+  ArrowLeft,
 } from 'lucide-react';
 import { formatPaiseToRupees } from '@pos/shared';
+import { usePosStore } from '@/stores/pos-store';
+import { apiClient } from '@/lib/api-client';
 
 export function BillingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const orderId = searchParams.get('orderId') || 'ord_1';
+  const tableId = searchParams.get('tableId') || 'tbl_1';
+  const paramTableName = searchParams.get('tableName');
+
+  const { getTableOrder, settleBillAndFreeTable, tables, outlet, setOutlet } = usePosStore();
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient
+      .get('/v1/outlet/profile')
+      .then((res) => {
+        if (!isMounted) return;
+        const o = res?.data?.outlet || res?.data;
+        if (o) setOutlet(o);
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [setOutlet]);
+
+  const currentTable = tables.find((t) => t.id === tableId);
+  const activeOrder = getTableOrder(tableId);
+
+  const tableName = paramTableName || activeOrder?.tableName || currentTable?.name || 'Counter';
+  const billLines = useMemo(() => {
+    if (activeOrder && activeOrder.lines?.length) {
+      return activeOrder.lines.filter((l) => l.status !== 'CANCELLED');
+    }
+    return [];
+  }, [activeOrder]);
+
+  const paramCustomerName = searchParams.get('customerName');
+  const paramCustomerPhone = searchParams.get('customerPhone');
 
   const [paymentMode, setPaymentMode] = useState('CASH'); // CASH, UPI, CARD, DUE
-  const [cashTendered, setCashTendered] = useState(100000); // 1000 rupees in paise
   const [cardRef, setCardRef] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState(paramCustomerPhone || activeOrder?.customerPhone || '');
+  const [customerName, setCustomerName] = useState(paramCustomerName || activeOrder?.customerName || '');
 
   // Modals state
   const [isDiscountOpen, setIsDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState('PERCENT'); // PERCENT or FLAT
   const [discountValue, setDiscountValue] = useState(10);
   const [discountReason, setDiscountReason] = useState('Happy Hours Promo');
+  const [appliedDiscount, setAppliedDiscount] = useState(null);
 
   const [isSplitOpen, setIsSplitOpen] = useState(false);
   const [splitCount, setSplitCount] = useState(2);
@@ -48,31 +82,18 @@ export function BillingPage() {
 
   const [settledSuccess, setSettledSuccess] = useState(null);
 
-  // Sample bill data
-  const [bill, setBill] = useState({
-    id: 'bil_001',
-    billNo: 'BIL-0042',
-    orderNo: 'ORD-0041',
-    tableName: 'Table 1',
-    guestCount: 3,
-    cashierName: 'Counter Cashier',
-    lines: [
-      { id: '1', name: 'Paneer Tikka (Full)', quantity: 1, unitPrice: 28000, gross: 28000 },
-      { id: '2', name: 'Butter Chicken (Full)', quantity: 1, unitPrice: 39000, gross: 39000 },
-      { id: '3', name: 'Butter Naan', quantity: 4, unitPrice: 6500, gross: 26000 },
-      { id: '4', name: 'Masala Chaas', quantity: 2, unitPrice: 7000, gross: 14000 },
-    ],
-    discount: null, // { type: 'PERCENT', value: 10, amount: 10700 }
-  });
+  // Calculate bill totals from real lines
+  const subtotal = billLines.reduce((sum, l) => {
+    const addons = (l.addons || []).reduce((acc, a) => acc + (a.price || 0), 0);
+    return sum + (l.unitPrice + addons) * l.quantity;
+  }, 0);
 
-  // Calculate bill totals
-  const subtotal = bill.lines.reduce((sum, l) => sum + l.gross, 0);
   let discountAmount = 0;
-  if (bill.discount) {
-    if (bill.discount.type === 'PERCENT') {
-      discountAmount = Math.round((subtotal * bill.discount.value) / 100);
+  if (appliedDiscount) {
+    if (appliedDiscount.type === 'PERCENT') {
+      discountAmount = Math.round((subtotal * appliedDiscount.value) / 100);
     } else {
-      discountAmount = bill.discount.value;
+      discountAmount = appliedDiscount.value;
     }
   }
 
@@ -83,239 +104,352 @@ export function BillingPage() {
   const roundOff = Math.round(rawTotal / 100) * 100 - rawTotal;
   const grandTotal = rawTotal + roundOff;
 
+  const [cashTendered, setCashTendered] = useState(grandTotal);
+  const [upiQrUrl, setUpiQrUrl] = useState('');
+  const restaurantUpiId = outlet?.upiId || 'ag7835445-2@okicici';
+  const restaurantName = outlet?.name || 'Restaurant';
+
+  // Update default cashTendered if grandTotal updates
+  useEffect(() => {
+    setCashTendered(grandTotal);
+  }, [grandTotal]);
+
+  // Generate dynamic NPCI compliant UPI QR Code with exact amount and restaurant UPI ID
+  useEffect(() => {
+    const amountInRupees = (grandTotal / 100).toFixed(2);
+    const upiUri = `upi://pay?pa=${encodeURIComponent(restaurantUpiId)}&pn=${encodeURIComponent(
+      restaurantName
+    )}&am=${amountInRupees}&cu=INR&tn=${encodeURIComponent(`Bill ${tableName}`)}`;
+
+    QRCode.toDataURL(upiUri, {
+      width: 240,
+      margin: 1,
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff',
+      },
+    })
+      .then((url) => setUpiQrUrl(url))
+      .catch((err) => console.error('Failed to generate UPI QR code:', err));
+  }, [grandTotal, tableName, restaurantUpiId]);
+
   const changeReturned = Math.max(0, cashTendered - grandTotal);
 
   const handleApplyDiscount = () => {
-    setBill((prev) => ({
-      ...prev,
-      discount: {
-        type: discountType,
-        value: discountType === 'PERCENT' ? Number(discountValue) : Number(discountValue) * 100,
-        reason: discountReason,
-      },
-    }));
+    setAppliedDiscount({
+      type: discountType,
+      value: discountType === 'PERCENT' ? Number(discountValue) : Number(discountValue) * 100,
+      reason: discountReason,
+    });
     setIsDiscountOpen(false);
   };
 
   const handleSettle = () => {
     const invoiceNo = `INV-2026-${Math.floor(Math.random() * 9000 + 1000)}`;
-    setSettledSuccess({
+    const now = new Date();
+
+    const invoicePayload = {
       invoiceNo,
+      tableId,
+      tableName,
+      guestCount: activeOrder?.guestCount || currentTable?.guestCount || 2,
+      outlet: outlet || undefined,
+      outletName: outlet?.name || 'Restaurant POS',
+      legalName: outlet?.legalName || '',
+      gstin: outlet?.gstin || '',
+      fssai: outlet?.fssaiNumber || outlet?.fssai || '',
+      phone: outlet?.phone || '',
+      email: outlet?.email || '',
+      address: outlet?.address || '',
+      upiId: outlet?.upiId || '',
+      lines: billLines.map((l) => ({
+        name: l.name + (l.variantName ? ` (${l.variantName})` : ''),
+        qty: l.quantity,
+        price: l.unitPrice,
+        total: (l.unitPrice + ((l.addons || []).reduce((acc, a) => acc + (a.price || 0), 0))) * l.quantity,
+      })),
+      subtotal,
+      discount: discountAmount,
+      discountObj: appliedDiscount,
+      taxable: taxableAmount,
+      cgst: cgstAmount,
+      sgst: sgstAmount,
+      roundOff,
       grandTotal,
       paymentMode,
       changeReturned,
-    });
+      customerPhone,
+      customerName,
+      date: now.toLocaleDateString('en-IN'),
+      time: now.toLocaleTimeString('en-IN'),
+      cashierName: 'Counter Cashier',
+    };
+
+    // Free the table and store the invoice in posStore
+    settleBillAndFreeTable(tableId, invoicePayload);
+
+    setSettledSuccess(invoicePayload);
   };
 
   return (
-    <div className="h-[calc(100vh-5rem)] flex flex-col lg:flex-row gap-4 overflow-hidden">
+    <div className="min-h-full lg:h-[calc(100vh-5.5rem)] flex flex-col lg:flex-row gap-4 overflow-visible lg:overflow-hidden max-w-7xl mx-auto pb-10 lg:pb-0">
       {/* LEFT PANEL: Bill Preview & Calculations */}
-      <div className="flex-1 flex flex-col bg-slate-900 border border-slate-800 rounded-xl p-4 overflow-hidden">
+      <div className="w-full flex-1 flex flex-col bg-white border border-slate-200 rounded-xl p-3 sm:p-4 overflow-visible lg:overflow-hidden shadow-xs">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div>
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-emerald-400" />
-              Provisional Bill Preview
-            </h1>
-            <p className="text-xs text-slate-400">
-              {bill.billNo} • {bill.tableName} • {bill.guestCount} Guests
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2 min-w-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-slate-500 hover:text-slate-900 shrink-0"
+              onClick={() => navigate('/tables')}
+              title="Back to Floor"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Floor
+            </Button>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5 truncate">
+                <Receipt className="w-4 h-4 text-slate-700 shrink-0" />
+                <span>Provisional Bill Preview</span>
+              </h1>
+              <p className="text-xs text-slate-500 font-medium truncate">
+                {tableName} • {billLines.length} items
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <Button
               size="sm"
               variant="outline"
-              className="text-xs h-8 gap-1.5 border-slate-800"
+              className="text-xs h-7 px-2 sm:px-2.5 gap-1 border-slate-200 text-slate-700 hover:bg-slate-100"
               onClick={() => setIsDiscountOpen(true)}
             >
-              <Percent className="w-3.5 h-3.5 text-amber-400" />
-              {bill.discount ? 'Edit Discount' : 'Discount'}
+              <Percent className="w-3 h-3 text-amber-600" />
+              <span className="hidden xs:inline">{appliedDiscount ? 'Edit Discount' : 'Discount'}</span>
+              <span className="xs:hidden">{appliedDiscount ? 'Disc ✓' : 'Disc'}</span>
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="text-xs h-8 gap-1.5 border-slate-800"
+              className="text-xs h-7 px-2 sm:px-2.5 gap-1 border-slate-200 text-slate-700 hover:bg-slate-100"
               onClick={() => setIsSplitOpen(true)}
             >
-              <Split className="w-3.5 h-3.5 text-blue-400" />
+              <Split className="w-3 h-3 text-sky-600" />
               Split
             </Button>
             <Button
               size="sm"
-              variant="destructive"
-              className="text-xs h-8 gap-1.5"
+              variant="outline"
+              className="text-xs h-7 px-2 sm:px-2.5 gap-1 border-rose-200 text-rose-600 hover:bg-rose-50"
               onClick={() => setIsVoidOpen(true)}
             >
-              <Ban className="w-3.5 h-3.5" />
+              <Ban className="w-3 h-3" />
               Void
             </Button>
           </div>
         </div>
 
         {/* Lines Table */}
-        <div className="flex-1 overflow-y-auto py-3">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/70 border-b border-slate-800 uppercase text-slate-400">
-              <tr>
-                <th className="py-2.5 px-3">Item Description</th>
-                <th className="py-2.5 px-3 text-center">Qty</th>
-                <th className="py-2.5 px-3 text-right">Price</th>
-                <th className="py-2.5 px-3 text-right">Gross Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 font-medium">
-              {bill.lines.map((line) => (
-                <tr key={line.id} className="hover:bg-slate-800/30">
-                  <td className="py-3 px-3 font-semibold text-white">{line.name}</td>
-                  <td className="py-3 px-3 text-center">{line.quantity}</td>
-                  <td className="py-3 px-3 text-right">₹{formatPaiseToRupees(line.unitPrice)}</td>
-                  <td className="py-3 px-3 text-right font-bold text-white">
-                    ₹{formatPaiseToRupees(line.gross)}
-                  </td>
+        <div className="w-full py-2 overflow-x-auto lg:flex-1 lg:overflow-y-auto">
+          {billLines.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+              <Receipt className="w-10 h-10 text-slate-300 mb-2" />
+              <p className="font-bold text-sm text-slate-800">No active order for {tableName}</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                This table does not have active items yet. Take an order or select an occupied table from the floor.
+              </p>
+              <div className="flex items-center gap-2 mt-4">
+                <Button
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-8 font-semibold"
+                  onClick={() => navigate(`/orders?tableId=${tableId}&tableName=${encodeURIComponent(tableName)}`)}
+                >
+                  Take Order for {tableName}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-slate-300 text-slate-700 text-xs h-8 font-semibold"
+                  onClick={() => navigate('/tables')}
+                >
+                  View Floor Tables
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs min-w-full">
+              <thead className="bg-slate-50 border-y border-slate-200 uppercase text-[10px] text-slate-500 font-bold">
+                <tr>
+                  <th className="py-2 px-2 sm:px-3">Item Description</th>
+                  <th className="py-2 px-1 sm:px-3 text-center w-12">Qty</th>
+                  <th className="py-2 px-2 sm:px-3 text-right">Price</th>
+                  <th className="py-2 px-2 sm:px-3 text-right">Gross Amount</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {billLines.map((line) => {
+                  const lineGross = (line.unitPrice + ((line.addons || []).reduce((acc, a) => acc + (a.price || 0), 0))) * line.quantity;
+                  return (
+                    <tr key={line.id} className="hover:bg-slate-50/70">
+                      <td className="py-2.5 px-2 sm:px-3 font-semibold text-slate-900 break-words">
+                        <div>{line.name} {line.variantName ? `(${line.variantName})` : ''}</div>
+                        {line.addons && line.addons.length > 0 && (
+                          <div className="text-[10px] text-slate-500 font-normal">
+                            + {line.addons.map((a) => a.name).join(', ')}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-1 sm:px-3 text-center whitespace-nowrap">{line.quantity}</td>
+                      <td className="py-2.5 px-2 sm:px-3 text-right font-medium whitespace-nowrap">{formatPaiseToRupees(line.unitPrice)}</td>
+                      <td className="py-2.5 px-2 sm:px-3 text-right font-bold text-slate-900 whitespace-nowrap">
+                        {formatPaiseToRupees(lineGross)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Breakdown Calculation */}
-        <div className="border-t border-slate-800 pt-3 space-y-1.5 bg-slate-950/40 p-3 rounded-lg">
-          <div className="flex justify-between text-xs text-slate-400">
+        <div className="border-t border-slate-100 pt-2.5 space-y-1.5 bg-slate-50/70 p-3 rounded-xl border mt-auto">
+          <div className="flex justify-between text-xs text-slate-600">
             <span>Item Subtotal</span>
-            <span>₹{formatPaiseToRupees(subtotal)}</span>
+            <span>{formatPaiseToRupees(subtotal)}</span>
           </div>
 
           {discountAmount > 0 && (
-            <div className="flex justify-between text-xs text-amber-400 font-medium">
+            <div className="flex justify-between text-xs text-amber-700 font-semibold">
               <span>
-                Discount ({bill.discount.type === 'PERCENT' ? `${bill.discount.value}%` : 'Flat'} - {bill.discount.reason})
+                Discount ({appliedDiscount.type === 'PERCENT' ? `${appliedDiscount.value}%` : 'Flat'} - {appliedDiscount.reason})
               </span>
-              <span>-₹{formatPaiseToRupees(discountAmount)}</span>
+              <span>-{formatPaiseToRupees(discountAmount)}</span>
             </div>
           )}
 
-          <div className="flex justify-between text-xs text-slate-400">
+          <div className="flex justify-between text-xs text-slate-600">
             <span>Taxable Amount</span>
-            <span>₹{formatPaiseToRupees(taxableAmount)}</span>
+            <span>{formatPaiseToRupees(taxableAmount)}</span>
           </div>
 
-          <div className="flex justify-between text-xs text-slate-400">
+          <div className="flex justify-between text-xs text-slate-600">
             <span>CGST (2.5%)</span>
-            <span>₹{formatPaiseToRupees(cgstAmount)}</span>
+            <span>{formatPaiseToRupees(cgstAmount)}</span>
           </div>
 
-          <div className="flex justify-between text-xs text-slate-400">
+          <div className="flex justify-between text-xs text-slate-600">
             <span>SGST (2.5%)</span>
-            <span>₹{formatPaiseToRupees(sgstAmount)}</span>
+            <span>{formatPaiseToRupees(sgstAmount)}</span>
           </div>
 
           {roundOff !== 0 && (
-            <div className="flex justify-between text-xs text-slate-400">
+            <div className="flex justify-between text-xs text-slate-600">
               <span>Round Off</span>
-              <span>₹{formatPaiseToRupees(roundOff)}</span>
+              <span>{formatPaiseToRupees(roundOff)}</span>
             </div>
           )}
 
-          <div className="flex justify-between text-base font-bold text-white pt-2 border-t border-slate-800">
+          <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-200">
             <span>Net Payable Total</span>
-            <span className="text-emerald-400 text-lg">₹{formatPaiseToRupees(grandTotal)}</span>
+            <span className="text-base text-slate-900">{formatPaiseToRupees(grandTotal)}</span>
           </div>
         </div>
       </div>
 
       {/* RIGHT PANEL: Payment Tender Panel */}
-      <div className="w-full lg:w-[460px] flex flex-col bg-slate-900 border border-slate-800 rounded-xl p-4 overflow-hidden">
-        <h2 className="text-base font-bold text-white pb-3 border-b border-slate-800 flex items-center justify-between">
-          <span>Payment & Settlement</span>
-          <span className="text-emerald-400 text-lg">₹{formatPaiseToRupees(grandTotal)}</span>
-        </h2>
+      <div className="w-full lg:w-[440px] flex flex-col bg-white border border-slate-200 rounded-xl p-3 sm:p-4 overflow-visible lg:overflow-hidden shadow-xs">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h2 className="text-sm font-bold text-slate-900">Payment & Settlement</h2>
+          <span className="text-base font-bold text-slate-900">{formatPaiseToRupees(grandTotal)}</span>
+        </div>
 
         {/* Mode Selector Tabs */}
-        <div className="grid grid-cols-4 gap-1.5 py-3 border-b border-slate-800">
+        <div className="grid grid-cols-4 gap-1.5 py-2.5 border-b border-slate-100">
           <button
             onClick={() => setPaymentMode('CASH')}
-            className={`p-2.5 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
+            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
               paymentMode === 'CASH'
-                ? 'bg-emerald-600/20 border-emerald-500 text-white font-bold'
-                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <Banknote className="w-4 h-4 text-emerald-400" />
+            <Banknote className="w-4 h-4 text-slate-700" />
             <span className="text-xs">Cash</span>
           </button>
 
           <button
             onClick={() => setPaymentMode('UPI')}
-            className={`p-2.5 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
+            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
               paymentMode === 'UPI'
-                ? 'bg-blue-600/20 border-blue-500 text-white font-bold'
-                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <QrCode className="w-4 h-4 text-blue-400" />
+            <QrCode className="w-4 h-4 text-slate-700" />
             <span className="text-xs">UPI QR</span>
           </button>
 
           <button
             onClick={() => setPaymentMode('CARD')}
-            className={`p-2.5 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
+            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
               paymentMode === 'CARD'
-                ? 'bg-purple-600/20 border-purple-500 text-white font-bold'
-                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <CreditCard className="w-4 h-4 text-purple-400" />
+            <CreditCard className="w-4 h-4 text-slate-700" />
             <span className="text-xs">Card</span>
           </button>
 
           <button
             onClick={() => setPaymentMode('DUE')}
-            className={`p-2.5 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
+            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
               paymentMode === 'DUE'
-                ? 'bg-amber-600/20 border-amber-500 text-white font-bold'
-                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span className="text-xs">Due/Credit</span>
+            <Clock className="w-4 h-4 text-slate-700" />
+            <span className="text-xs">Credit/Due</span>
           </button>
         </div>
 
         {/* Dynamic Mode Forms */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-4">
+        <div className="py-3 space-y-3 lg:flex-1 lg:overflow-y-auto no-scrollbar">
           {paymentMode === 'CASH' && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-400">Cash Tendered by Customer (₹)</label>
+                <label className="text-xs font-semibold text-slate-700">Cash Received from Customer</label>
                 <div className="relative mt-1">
-                  <span className="absolute left-3 top-2.5 text-slate-500 text-sm font-bold">₹</span>
+                  <span className="absolute left-3 top-2 text-slate-400 text-sm font-bold">₹</span>
                   <Input
                     type="number"
                     value={cashTendered / 100}
                     onChange={(e) => setCashTendered(Math.round(Number(e.target.value) * 100))}
-                    className="pl-8 text-lg font-bold bg-slate-950 border-slate-800 text-white"
+                    className="pl-7 text-base font-bold bg-slate-50 border-slate-200 text-slate-900 h-9"
                   />
                 </div>
               </div>
 
               {/* Currency Presets */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
                   { label: 'Exact', val: grandTotal },
-                  { label: '₹100', val: 10000 },
-                  { label: '₹200', val: 20000 },
                   { label: '₹500', val: 50000 },
                   { label: '₹1,000', val: 100000 },
+                  { label: '₹1,500', val: 150000 },
                   { label: '₹2,000', val: 200000 },
+                  { label: '₹3,000', val: 300000 },
                 ].map((preset) => (
                   <Button
                     key={preset.label}
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="border-slate-800 hover:border-emerald-500 text-xs font-semibold"
+                    className="border-slate-200 hover:bg-slate-100 text-xs font-semibold h-8 text-slate-700"
                     onClick={() => setCashTendered(preset.val)}
                   >
                     {preset.label}
@@ -324,81 +458,102 @@ export function BillingPage() {
               </div>
 
               {/* Change Return Card */}
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400">Change to Return</p>
+                  <p className="text-xs text-slate-500 font-medium">Change to Return</p>
                   <p
-                    className={`text-xl font-bold ${
-                      cashTendered < grandTotal ? 'text-rose-400' : 'text-emerald-400'
+                    className={`text-lg font-bold ${
+                      cashTendered < grandTotal ? 'text-rose-600' : 'text-slate-900'
                     }`}
                   >
-                    ₹{formatPaiseToRupees(changeReturned)}
+                    {formatPaiseToRupees(changeReturned)}
                   </p>
                 </div>
                 {cashTendered < grandTotal && (
-                  <span className="text-xs text-rose-400 font-semibold">Short by ₹{formatPaiseToRupees(grandTotal - cashTendered)}</span>
+                  <span className="text-[11px] text-rose-600 font-semibold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                    Short by {formatPaiseToRupees(grandTotal - cashTendered)}
+                  </span>
                 )}
               </div>
             </div>
           )}
 
           {paymentMode === 'UPI' && (
-            <div className="flex flex-col items-center justify-center p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
-              <div className="p-3 bg-white rounded-xl shadow-lg">
-                <QrCode className="w-36 h-36 text-slate-900" />
+            <div className="flex flex-col items-center justify-center p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+              <div className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col items-center">
+                {upiQrUrl ? (
+                  <img
+                    src={upiQrUrl}
+                    alt={`Scan to pay ${formatPaiseToRupees(grandTotal)}`}
+                    className="w-48 h-48 rounded-md object-contain"
+                  />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center">
+                    <QrCode className="w-24 h-24 text-slate-300 animate-pulse" />
+                  </div>
+                )}
+                <div className="flex items-center gap-2 pt-1.5 text-[10px] font-bold text-slate-600">
+                  <span className="text-emerald-700">Google Pay</span> •{' '}
+                  <span className="text-purple-700">PhonePe</span> •{' '}
+                  <span className="text-sky-700">Paytm</span> •{' '}
+                  <span className="text-orange-700">BHIM</span>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="text-xs font-semibold text-slate-300">Scan via GPay / PhonePe / Paytm</p>
-                <p className="text-lg font-bold text-emerald-400">₹{formatPaiseToRupees(grandTotal)}</p>
-                <p className="text-[11px] text-slate-500 font-mono">VPA: restaurant@icici</p>
+
+              <div className="text-center space-y-0.5">
+                <p className="text-xs font-semibold text-slate-700">Scan to pay exact bill amount</p>
+                <p className="text-base font-bold text-slate-900">{formatPaiseToRupees(grandTotal)}</p>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  UPI VPA: <span className="font-mono font-bold text-slate-800">{restaurantUpiId}</span>
+                </p>
               </div>
             </div>
           )}
 
           {paymentMode === 'CARD' && (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div>
-                <label className="text-xs font-semibold text-slate-400">Card Swiped Amount</label>
+                <label className="text-xs font-semibold text-slate-700">Card Swiped Amount</label>
                 <Input
                   disabled
-                  value={`₹${formatPaiseToRupees(grandTotal)}`}
-                  className="bg-slate-950 border-slate-800 font-bold text-white text-base mt-1"
+                  value={formatPaiseToRupees(grandTotal)}
+                  className="bg-slate-100 border-slate-200 font-bold text-slate-900 text-sm mt-1 h-9"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-400">EDC Terminal RRN / Auth Code</label>
+                <label className="text-xs font-semibold text-slate-700">EDC Terminal RRN / Auth Code</label>
                 <Input
-                  placeholder="Enter swipe transaction ID..."
+                  placeholder="Enter swipe approval code..."
                   value={cardRef}
                   onChange={(e) => setCardRef(e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-sm mt-1"
+                  className="bg-slate-50 border-slate-200 text-xs mt-1 h-9"
                 />
               </div>
             </div>
           )}
 
           {paymentMode === 'DUE' && (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div>
-                <label className="text-xs font-semibold text-slate-400">Customer Phone Number</label>
+                <label className="text-xs font-semibold text-slate-700">Customer Mobile</label>
                 <Input
                   placeholder="10-digit mobile number"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-sm mt-1"
+                  className="bg-slate-50 border-slate-200 text-xs mt-1 h-9"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-400">Customer Name / Company</label>
+                <label className="text-xs font-semibold text-slate-700">Customer Name / Company</label>
                 <Input
-                  placeholder="Full Name"
+                  placeholder="Customer Full Name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-sm mt-1"
+                  className="bg-slate-50 border-slate-200 text-xs mt-1 h-9"
                 />
               </div>
-              <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-1.5 font-medium">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>Amount will be logged in customer credit ledger for future settlement.</span>
               </div>
             </div>
@@ -406,13 +561,13 @@ export function BillingPage() {
         </div>
 
         {/* Settlement CTA Button */}
-        <div className="border-t border-slate-800 pt-3">
+        <div className="border-t border-slate-100 pt-3">
           <Button
-            className="w-full bg-emerald-600 hover:bg-emerald-500 h-12 text-base font-bold gap-2"
+            className="w-full bg-rose-600 hover:bg-rose-700 text-white h-11 text-sm font-bold gap-2 shadow-xs"
             disabled={paymentMode === 'CASH' && cashTendered < grandTotal}
             onClick={handleSettle}
           >
-            <CheckCircle2 className="w-5 h-5" />
+            <CheckCircle2 className="w-4 h-4" />
             Settle Bill & Issue Invoice
           </Button>
         </div>
@@ -420,16 +575,16 @@ export function BillingPage() {
 
       {/* Discount Modal */}
       {isDiscountOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <Card className="w-full max-w-md bg-white border-slate-200 shadow-2xl">
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Percent className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Percent className="w-4 h-4 text-amber-600" />
                   Apply Bill Discount
                 </h3>
-                <button onClick={() => setIsDiscountOpen(false)} className="text-slate-400 hover:text-white">
-                  <X className="w-5 h-5" />
+                <button onClick={() => setIsDiscountOpen(false)} className="text-slate-400 hover:text-slate-700">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
@@ -437,7 +592,7 @@ export function BillingPage() {
                 <Button
                   type="button"
                   variant={discountType === 'PERCENT' ? 'default' : 'outline'}
-                  className={discountType === 'PERCENT' ? 'bg-amber-600' : 'border-slate-800'}
+                  className={discountType === 'PERCENT' ? 'bg-slate-900 text-white' : 'border-slate-200'}
                   onClick={() => setDiscountType('PERCENT')}
                 >
                   Percentage (%)
@@ -445,7 +600,7 @@ export function BillingPage() {
                 <Button
                   type="button"
                   variant={discountType === 'FLAT' ? 'default' : 'outline'}
-                  className={discountType === 'FLAT' ? 'bg-amber-600' : 'border-slate-800'}
+                  className={discountType === 'FLAT' ? 'bg-slate-900 text-white' : 'border-slate-200'}
                   onClick={() => setDiscountType('FLAT')}
                 >
                   Flat Amount (₹)
@@ -453,32 +608,32 @@ export function BillingPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-300">
+                <label className="text-xs font-semibold text-slate-700">
                   {discountType === 'PERCENT' ? 'Discount Percentage (%)' : 'Discount Amount (₹)'}
                 </label>
                 <Input
                   type="number"
                   value={discountValue}
                   onChange={(e) => setDiscountValue(e.target.value)}
-                  className="bg-slate-950 border-slate-800 mt-1"
+                  className="bg-slate-50 border-slate-200 mt-1 h-9 text-xs"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-300">Discount Reason</label>
+                <label className="text-xs font-semibold text-slate-700">Discount Reason</label>
                 <Input
                   value={discountReason}
                   onChange={(e) => setDiscountReason(e.target.value)}
-                  placeholder="e.g. Regular Guest, Management Courtesy"
-                  className="bg-slate-950 border-slate-800 mt-1"
+                  placeholder="e.g. Regular Guest, Manager Discretion"
+                  className="bg-slate-50 border-slate-200 mt-1 h-9 text-xs"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <Button variant="ghost" onClick={() => setIsDiscountOpen(false)}>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button variant="ghost" size="sm" className="text-xs text-slate-600" onClick={() => setIsDiscountOpen(false)}>
                   Cancel
                 </Button>
-                <Button className="bg-amber-600 hover:bg-amber-500" onClick={handleApplyDiscount}>
+                <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold" onClick={handleApplyDiscount}>
                   Apply Discount
                 </Button>
               </div>
@@ -489,28 +644,28 @@ export function BillingPage() {
 
       {/* Split Bill Modal */}
       {isSplitOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <Card className="w-full max-w-md bg-white border-slate-200 shadow-2xl">
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Split className="w-5 h-5 text-blue-400" />
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Split className="w-4 h-4 text-sky-600" />
                   Split Bill
                 </h3>
-                <button onClick={() => setIsSplitOpen(false)} className="text-slate-400 hover:text-white">
-                  <X className="w-5 h-5" />
+                <button onClick={() => setIsSplitOpen(false)} className="text-slate-400 hover:text-slate-700">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-300">Split Equally Among People:</label>
-                <div className="flex items-center gap-2 mt-2">
+                <label className="text-xs font-semibold text-slate-700">Split Equally Among People:</label>
+                <div className="flex items-center gap-1.5 mt-2">
                   {[2, 3, 4, 5, 6].map((num) => (
                     <Button
                       key={num}
                       type="button"
                       variant={splitCount === num ? 'default' : 'outline'}
-                      className={splitCount === num ? 'bg-blue-600' : 'border-slate-800'}
+                      className={splitCount === num ? 'bg-slate-900 text-white' : 'border-slate-200 text-slate-700'}
                       onClick={() => setSplitCount(num)}
                     >
                       {num} Ways
@@ -519,22 +674,21 @@ export function BillingPage() {
                 </div>
               </div>
 
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-center">
-                <p className="text-xs text-slate-400">Each Person Pays:</p>
-                <p className="text-xl font-bold text-blue-400">
-                  ₹{formatPaiseToRupees(Math.round(grandTotal / splitCount))}
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+                <p className="text-xs text-slate-500 font-medium">Each Person Pays:</p>
+                <p className="text-lg font-bold text-slate-900">
+                  {formatPaiseToRupees(Math.round(grandTotal / splitCount))}
                 </p>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <Button variant="ghost" onClick={() => setIsSplitOpen(false)}>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button variant="ghost" size="sm" className="text-xs text-slate-600" onClick={() => setIsSplitOpen(false)}>
                   Cancel
                 </Button>
                 <Button
-                  className="bg-blue-600 hover:bg-blue-500"
-                  onClick={() => {
-                    setIsSplitOpen(false);
-                  }}
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold"
+                  onClick={() => setIsSplitOpen(false)}
                 >
                   Generate Split Invoices
                 </Button>
@@ -546,46 +700,50 @@ export function BillingPage() {
 
       {/* Void Bill Modal */}
       {isVoidOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <Card className="w-full max-w-md bg-white border-slate-200 shadow-2xl">
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center gap-2">
-                <Ban className="w-5 h-5 text-rose-500" />
-                <h3 className="text-lg font-bold text-white">Void Bill (Manager Approval)</h3>
+                <Ban className="w-5 h-5 text-rose-600" />
+                <h3 className="text-base font-bold text-slate-900">Void Bill (Manager Approval)</h3>
               </div>
-              <p className="text-xs text-slate-400">
-                Voiding a bill requires manager override PIN and logs an irreversible audit entry.
+              <p className="text-xs text-slate-500">
+                Voiding a bill requires manager override PIN and frees the table.
               </p>
 
               <div>
-                <label className="text-xs font-semibold text-slate-300">Reason for Voiding:</label>
+                <label className="text-xs font-semibold text-slate-700">Reason for Voiding:</label>
                 <Input
                   value={voidReason}
                   onChange={(e) => setVoidReason(e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-xs mt-1"
+                  className="bg-slate-50 border-slate-200 text-xs mt-1 h-9 text-slate-800"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-300">Manager Security PIN:</label>
+                <label className="text-xs font-semibold text-slate-700">Manager Security PIN:</label>
                 <Input
                   type="password"
                   maxLength={4}
-                  placeholder="Enter 4-digit PIN (1234)"
+                  placeholder="Enter 4-digit PIN"
                   value={managerPin}
                   onChange={(e) => setManagerPin(e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-sm mt-1 tracking-widest text-center"
+                  className="bg-slate-50 border-slate-200 text-sm mt-1 tracking-widest text-center h-9 text-slate-800 font-bold"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <Button variant="ghost" onClick={() => setIsVoidOpen(false)}>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button variant="ghost" size="sm" className="text-xs text-slate-600" onClick={() => setIsVoidOpen(false)}>
                   Cancel
                 </Button>
                 <Button
+                  size="sm"
                   variant="destructive"
+                  className="text-xs font-semibold"
                   onClick={() => {
                     setIsVoidOpen(false);
+                    // Free the table on void
+                    settleBillAndFreeTable(tableId, { invoiceNo: 'VOID-' + Date.now() });
                     navigate('/tables');
                   }}
                 >
@@ -599,30 +757,32 @@ export function BillingPage() {
 
       {/* Settlement Success Dialog */}
       {settledSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <Card className="w-full max-w-md bg-white border-slate-200 shadow-2xl">
             <CardContent className="p-6 text-center space-y-4">
-              <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-7 h-7" />
+              <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">Bill Settled Successfully!</h3>
-                <p className="text-xs text-slate-400 mt-1">Invoice #{settledSuccess.invoiceNo} issued</p>
+                <h3 className="text-lg font-bold text-slate-900">Bill Settled Successfully!</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Invoice #{settledSuccess.invoiceNo} issued • {tableName} is now VACANT
+                </p>
               </div>
 
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1 text-xs">
-                <div className="flex justify-between text-slate-400">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1 text-xs">
+                <div className="flex justify-between text-slate-600">
                   <span>Settled Amount</span>
-                  <span className="font-bold text-white">₹{formatPaiseToRupees(settledSuccess.grandTotal)}</span>
+                  <span className="font-bold text-slate-900">{formatPaiseToRupees(settledSuccess.grandTotal)}</span>
                 </div>
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-slate-600">
                   <span>Payment Mode</span>
-                  <span className="font-bold text-white">{settledSuccess.paymentMode}</span>
+                  <span className="font-bold text-slate-900">{settledSuccess.paymentMode}</span>
                 </div>
                 {settledSuccess.changeReturned > 0 && (
-                  <div className="flex justify-between text-emerald-400 font-bold">
+                  <div className="flex justify-between text-emerald-700 font-bold">
                     <span>Change Returned</span>
-                    <span>₹{formatPaiseToRupees(settledSuccess.changeReturned)}</span>
+                    <span>{formatPaiseToRupees(settledSuccess.changeReturned)}</span>
                   </div>
                 )}
               </div>
@@ -630,17 +790,19 @@ export function BillingPage() {
               <div className="flex gap-2 pt-2">
                 <Button
                   variant="outline"
-                  className="flex-1 border-slate-800 gap-1.5"
+                  size="sm"
+                  className="flex-1 border-slate-200 text-xs font-semibold text-slate-700"
                   onClick={() => navigate(`/invoices/preview?no=${settledSuccess.invoiceNo}`)}
                 >
-                  <Printer className="w-4 h-4 text-emerald-400" />
+                  <Printer className="w-3.5 h-3.5 mr-1" />
                   Print Receipt
                 </Button>
                 <Button
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 font-semibold"
+                  size="sm"
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold"
                   onClick={() => navigate('/tables')}
                 >
-                  Next Order
+                  Back to Tables
                 </Button>
               </div>
             </CardContent>

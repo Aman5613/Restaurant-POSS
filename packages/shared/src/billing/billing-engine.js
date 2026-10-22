@@ -234,3 +234,45 @@ export function calculateBill({
     lines: linesWithTax,
   };
 }
+
+/**
+ * Adapter function matching the billing.service interface
+ */
+export function computeBill({
+  lines = [],
+  items = [],
+  discount = null,
+  billDiscount = null,
+  charges = [],
+  isInterState = false,
+} = {}) {
+  const lineItems = lines.length > 0 ? lines : items;
+  const activeDiscount = discount || billDiscount;
+
+  const result = calculateBill({
+    items: lineItems,
+    billDiscount: activeDiscount,
+    charges,
+    isInterState,
+  });
+
+  return {
+    ...result,
+    discountTotal: result.totalDiscount,
+    cgstTotal: result.taxes.cgst,
+    sgstTotal: result.taxes.sgst,
+    igstTotal: result.taxes.igst,
+    chargesTotal: result.totalCharges,
+    grandTotal: result.payableAmount,
+    lines: result.lines.map((l) => ({
+      ...l,
+      grossAmount: l.gross,
+      lineDiscountAmount: l.lineDiscount,
+      cgstAmount: l.cgst,
+      sgstAmount: l.sgst,
+      igstAmount: l.igst,
+      totalAmount: l.finalAmount,
+    })),
+  };
+}
+

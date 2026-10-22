@@ -5,8 +5,17 @@ import { ROLES, ROLE_DEFINITIONS } from '@pos/shared';
 export class UsersService {
   async listUsers(outletId, { role, isActive, search } = {}) {
     const query = {};
-    if (outletId) query.outletId = outletId;
-    if (role) query.role = role;
+    if (outletId) {
+      query.outletId = outletId;
+    }
+
+    // Strict Data Isolation: Never expose SUPER_ADMIN in outlet staff listings
+    if (role && role !== ROLES.SUPER_ADMIN) {
+      query.role = role;
+    } else {
+      query.role = { $ne: ROLES.SUPER_ADMIN };
+    }
+
     if (typeof isActive === 'boolean') query.isActive = isActive;
     if (search) {
       query.$or = [
@@ -16,19 +25,29 @@ export class UsersService {
       ];
     }
 
-    const users = await User.find(query).select('-passwordHash -pinHash').sort({ createdAt: -1 });
-    return users;
+    const users = await User.find(query).select('-passwordHash').sort({ createdAt: -1 });
+    return users.map((u) => {
+      const obj = u.toObject();
+      obj.hasPin = Boolean(obj.pinHash);
+      delete obj.pinHash;
+      return obj;
+    });
   }
 
   async getUser(outletId, userId) {
-    const user = await User.findOne({ _id: userId, ...(outletId ? { outletId } : {}) }).select(
-      '-passwordHash -pinHash'
-    );
+    const user = await User.findOne({
+      _id: userId,
+      role: { $ne: ROLES.SUPER_ADMIN },
+      ...(outletId ? { outletId } : {}),
+    }).select('-passwordHash -pinHash');
     if (!user) throw { statusCode: 404, message: 'User not found' };
     return user;
   }
 
   async createUser(outletId, data) {
+    if (data.role === ROLES.SUPER_ADMIN) {
+      throw { statusCode: 403, message: 'Super Admin accounts cannot be created as outlet employees' };
+    }
     // 1. Phone uniqueness check
     const existingPhone = await User.findOne({
       phone: data.phone,
@@ -122,7 +141,9 @@ export class UsersService {
 
   async deleteUser(outletId, userId) {
     const user = await User.findOne({ _id: userId, ...(outletId ? { outletId } : {}) });
-    if (!user) throw { statusCode: 404, message: 'User not found' };
+    if (user.role === ROLES.SUPER_ADMIN) {
+      throw { statusCode: 403, message: 'Cannot delete Super Admin account' };
+    }
 
     if (user.role === ROLES.ADMIN) {
       const adminCount = await User.countDocuments({

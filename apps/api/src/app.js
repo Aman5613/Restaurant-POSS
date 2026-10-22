@@ -20,6 +20,7 @@ import { customersRoutes } from './modules/customers/customers.routes.js';
 import { reportsRoutes } from './modules/reports/reports.routes.js';
 import { auditRoutes } from './modules/audit/audit.routes.js';
 import { syncRoutes } from './modules/sync/sync.routes.js';
+import { superAdminRoutes } from './modules/super-admin/super-admin.routes.js';
 import { socketIoPlugin } from './plugins/socket.js';
 
 export async function buildApp(opts = {}) {
@@ -37,8 +38,17 @@ export async function buildApp(opts = {}) {
   });
 
   // Base plugins
+  const corsOrigins =
+    env.NODE_ENV === 'development'
+      ? true
+      : env.CORS_ORIGIN.includes(',')
+      ? env.CORS_ORIGIN.split(',').map((s) => s.trim())
+      : env.CORS_ORIGIN === '*'
+      ? true
+      : env.CORS_ORIGIN;
+
   await fastify.register(cors, {
-    origin: env.NODE_ENV === 'development' ? true : env.CORS_ORIGIN,
+    origin: corsOrigins,
     credentials: true,
   });
 
@@ -61,8 +71,9 @@ export async function buildApp(opts = {}) {
     });
   }
 
-  // Health check route
+  // Health check routes
   fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+  fastify.get('/v1/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
   // API v1 routes
   await fastify.register(authRoutes, { prefix: '/v1/auth' });
@@ -79,6 +90,7 @@ export async function buildApp(opts = {}) {
   await fastify.register(reportsRoutes, { prefix: '/v1/reports' });
   await fastify.register(auditRoutes, { prefix: '/v1/audit-logs' });
   await fastify.register(syncRoutes, { prefix: '/v1/sync' });
+  await fastify.register(superAdminRoutes, { prefix: '/v1/super-admin' });
 
   return fastify;
 }

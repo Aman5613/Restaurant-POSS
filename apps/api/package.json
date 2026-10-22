@@ -8,6 +8,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "seed": "node src/scripts/seed.js",
+    "simulate:day": "node src/scripts/simulate-day-cycle.js",
     "test": "vitest run",
     "lint": "eslint src/"
   },

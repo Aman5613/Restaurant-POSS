@@ -1,0 +1,52 @@
+services:
+  # 1. Fastify Backend API (Docker Web Service)
+  - type: web
+    name: restaurant-pos-api
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        fromService:
+          type: web
+          name: restaurant-pos-web
+          property: host
+
+  # 2. React Vite Frontend (Static Site)
+  - type: web
+    name: restaurant-pos-web
+    env: static
+    plan: free
+    region: oregon
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @pos/shared build && pnpm --filter @pos/web build
+    staticPublishPath: apps/web/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: restaurant-pos-api
+          property: host
+      - key: VITE_SOCKET_URL
+        fromService:
+          type: web
+          name: restaurant-pos-api
+          property: host

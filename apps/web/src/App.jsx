@@ -16,18 +16,36 @@ import { FloorViewPage } from './features/tables/floor-view-page';
 import { OrderScreenPage } from './features/orders/order-screen-page';
 import { OrderListPage } from './features/orders/order-list-page';
 import { PrintQueuePage } from './features/kot/print-queue-page';
+import { KitchenDisplayPage } from './features/kot/kitchen-display-page';
 import { BillingPage } from './features/billing/billing-page';
 import { InvoicePreviewPage } from './features/billing/invoice-preview-page';
 import { DayManagementPage } from './features/day-ops/day-management-page';
+import { ManagerPage } from './features/manager/manager-page';
 import { CustomerListPage } from './features/customers/customer-list-page';
 import { ReportsDashboardPage } from './features/reports/reports-dashboard-page';
 import { AuditLogPage } from './features/audit/audit-log-page';
+import { SuperAdminPage } from './features/super-admin/super-admin-page';
+import { AdminDashboardPage } from './features/admin/admin-dashboard-page';
 import { ROLES } from '@pos/shared';
+import { useAuthStore } from './stores/auth-store';
 
 const queryClient = new QueryClient();
 
-// Overview Dashboard
+// Overview Dashboard - routes to dedicated role dashboard
 function Dashboard() {
+  const { user } = useAuthStore();
+  if (user?.role === ROLES.SUPER_ADMIN || user?.role === 'super-admin') {
+    return <Navigate to="/super-admin" replace />;
+  }
+  if (user?.role === ROLES.ADMIN || user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+  if (user?.role === ROLES.MANAGER || user?.role === 'manager') {
+    return <Navigate to="/manager" replace />;
+  }
+  if (user?.role === ROLES.COOK || user?.role === 'cook') {
+    return <Navigate to="/kitchen" replace />;
+  }
   return <FloorViewPage />;
 }
 
@@ -49,6 +67,8 @@ export function App() {
             <Route path="orders/new" element={<OrderScreenPage />} />
             <Route path="orders/list" element={<OrderListPage />} />
             <Route path="kot" element={<PrintQueuePage />} />
+            <Route path="kitchen" element={<KitchenDisplayPage />} />
+            <Route path="kds" element={<KitchenDisplayPage />} />
             <Route path="billing" element={<BillingPage />} />
             <Route path="invoices/preview" element={<InvoicePreviewPage />} />
             <Route path="day-ops" element={<DayManagementPage />} />
@@ -56,11 +76,28 @@ export function App() {
             <Route path="menu" element={<MenuPage />} />
 
             {/* Protected Routes by Role */}
-            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
-              <Route path="reports" element={<ReportsDashboardPage />} />
+            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.SUPER_ADMIN]} />}>
               <Route path="audit-logs" element={<AuditLogPage />} />
-              <Route path="settings" element={<OutletSettingsPage />} />
+            </Route>
+
+            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
+              <Route path="manager" element={<ManagerPage />} />
+              <Route path="reports" element={<ReportsDashboardPage />} />
               <Route path="users" element={<UsersPage />} />
+            </Route>
+
+            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN]} />}>
+              <Route path="settings" element={<OutletSettingsPage />} />
+            </Route>
+
+            {/* Admin (Owner) Control Hub */}
+            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN]} />}>
+              <Route path="admin" element={<AdminDashboardPage />} />
+            </Route>
+
+            {/* Platform Super-Admin Control Hub */}
+            <Route element={<RoleGuard allowedRoles={[ROLES.SUPER_ADMIN]} />}>
+              <Route path="super-admin" element={<SuperAdminPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

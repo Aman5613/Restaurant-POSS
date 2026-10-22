@@ -1,0 +1,22 @@
+{
+  "name": "@pos/print-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@pos/eslint-config": "workspace:*",
+    "eslint": "^9.21.0",
+    "vitest": "^3.0.7"
+  }
+}

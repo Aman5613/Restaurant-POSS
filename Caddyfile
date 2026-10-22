@@ -1,0 +1,19 @@
+:80 {
+    encode gzip zstd
+
+    # Fastify API and Realtime Socket.IO
+    handle /v1/* {
+        reverse_proxy api:3000
+    }
+
+    handle /socket.io/* {
+        reverse_proxy api:3000
+    }
+
+    # Static Web SPA
+    handle {
+        root * /srv/web
+        try_files {path} /index.html
+        file_server
+    }
+}

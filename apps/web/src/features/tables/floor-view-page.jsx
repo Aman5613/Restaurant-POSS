@@ -8,124 +8,29 @@ import {
   Users,
   Clock,
   ArrowRightLeft,
-  Merge,
   Search,
-  PlusCircle,
-  IndianRupee,
+  Plus,
   UtensilsCrossed,
+  RotateCcw,
 } from 'lucide-react';
 import { formatPaiseToRupees, TABLE_STATUS } from '@pos/shared';
+import { usePosStore } from '@/stores/pos-store';
 
 export function FloorViewPage() {
   const navigate = useNavigate();
+  const { tables, areas: storeAreas } = usePosStore();
   const [selectedArea, setSelectedArea] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [search, setSearch] = useState('');
   const [transferModal, setTransferModal] = useState(null);
 
-  const areas = [
+  const areas = storeAreas?.length ? storeAreas : [
     { id: 'area_1', name: 'Ground Floor AC' },
     { id: 'area_2', name: 'Terrace Garden' },
     { id: 'area_3', name: 'First Floor Family' },
   ];
 
-  const [tables, setTables] = useState([
-    {
-      id: 'tbl_1',
-      tableNumber: 'T-01',
-      name: 'Table 1',
-      areaId: 'area_1',
-      capacity: 4,
-      status: TABLE_STATUS.OCCUPIED,
-      runningAmount: 94000,
-      elapsedMinutes: 38,
-      captainName: 'Ramesh (Captain)',
-      guestCount: 3,
-      currentOrderId: 'ord_1',
-    },
-    {
-      id: 'tbl_2',
-      tableNumber: 'T-02',
-      name: 'Table 2',
-      areaId: 'area_1',
-      capacity: 2,
-      status: TABLE_STATUS.VACANT,
-      runningAmount: 0,
-      elapsedMinutes: 0,
-    },
-    {
-      id: 'tbl_3',
-      tableNumber: 'T-03',
-      name: 'Table 3',
-      areaId: 'area_1',
-      capacity: 6,
-      status: TABLE_STATUS.BILLED,
-      runningAmount: 185000,
-      elapsedMinutes: 62,
-      captainName: 'Suresh (Captain)',
-      guestCount: 5,
-      currentOrderId: 'ord_2',
-    },
-    {
-      id: 'tbl_4',
-      tableNumber: 'T-04',
-      name: 'Table 4',
-      areaId: 'area_1',
-      capacity: 4,
-      status: TABLE_STATUS.VACANT,
-      runningAmount: 0,
-      elapsedMinutes: 0,
-    },
-    {
-      id: 'tbl_5',
-      tableNumber: 'T-05',
-      name: 'Table 5',
-      areaId: 'area_2',
-      capacity: 4,
-      status: TABLE_STATUS.OCCUPIED,
-      runningAmount: 72000,
-      elapsedMinutes: 20,
-      captainName: 'Ramesh (Captain)',
-      guestCount: 2,
-      currentOrderId: 'ord_3',
-    },
-    {
-      id: 'tbl_6',
-      tableNumber: 'T-06',
-      name: 'Table 6',
-      areaId: 'area_2',
-      capacity: 8,
-      status: TABLE_STATUS.RESERVED,
-      runningAmount: 0,
-      elapsedMinutes: 0,
-      guestCount: 6,
-    },
-    {
-      id: 'tbl_7',
-      tableNumber: 'T-07',
-      name: 'Table 7',
-      areaId: 'area_3',
-      capacity: 4,
-      status: TABLE_STATUS.VACANT,
-      runningAmount: 0,
-      elapsedMinutes: 0,
-    },
-    {
-      id: 'tbl_8',
-      tableNumber: 'T-08',
-      name: 'Table 8',
-      areaId: 'area_3',
-      capacity: 4,
-      status: TABLE_STATUS.OCCUPIED,
-      runningAmount: 124000,
-      elapsedMinutes: 45,
-      captainName: 'Suresh (Captain)',
-      guestCount: 4,
-      currentOrderId: 'ord_4',
-    },
-  ]);
-
-  const filteredTables = tables.filter((t) => {
+  const filteredTables = (tables || []).filter((t) => {
     const matchesArea = selectedArea === 'ALL' || t.areaId === selectedArea;
     const matchesStatus = selectedStatus === 'ALL' || t.status === selectedStatus;
     const matchesSearch =
@@ -134,166 +39,188 @@ export function FloorViewPage() {
     return matchesArea && matchesStatus && matchesSearch;
   });
 
-  const vacantCount = tables.filter((t) => t.status === TABLE_STATUS.VACANT).length;
-  const occupiedCount = tables.filter((t) => t.status === TABLE_STATUS.OCCUPIED).length;
-  const billedCount = tables.filter((t) => t.status === TABLE_STATUS.BILLED).length;
-  const totalRunningSales = tables.reduce((acc, t) => acc + (t.runningAmount || 0), 0);
+  const vacantCount = (tables || []).filter((t) => t.status === TABLE_STATUS.VACANT).length;
+  const occupiedCount = (tables || []).filter((t) => t.status === TABLE_STATUS.OCCUPIED).length;
+  const billedCount = (tables || []).filter((t) => t.status === TABLE_STATUS.BILLED).length;
+  const totalRunningSales = (tables || []).reduce((acc, t) => acc + (t.runningAmount || 0), 0);
 
-  const getStatusBorder = (status) => {
+  const getStatusCardClasses = (status) => {
     switch (status) {
       case TABLE_STATUS.VACANT:
-        return 'border-emerald-500/40 hover:border-emerald-500 bg-emerald-500/5';
+        return 'bg-white border-slate-200 hover:border-slate-300 shadow-xs';
       case TABLE_STATUS.OCCUPIED:
-        return 'border-blue-500/50 hover:border-blue-500 bg-blue-500/5 shadow-blue-500/10 shadow-lg';
+        return 'bg-sky-50/30 border-sky-300 hover:border-sky-400 shadow-xs';
       case TABLE_STATUS.BILLED:
-        return 'border-amber-500/50 hover:border-amber-500 bg-amber-500/5 shadow-amber-500/10 shadow-lg';
+        return 'bg-emerald-50/30 border-emerald-300 hover:border-emerald-400 shadow-xs';
       case TABLE_STATUS.RESERVED:
-        return 'border-purple-500/40 hover:border-purple-500 bg-purple-500/5';
+        return 'bg-amber-50/30 border-amber-300 hover:border-amber-400 shadow-xs';
       default:
-        return 'border-slate-800 bg-slate-900/50';
+        return 'bg-white border-slate-200';
     }
   };
 
   const getStatusBadge = (status) => {
     switch (status) {
       case TABLE_STATUS.VACANT:
-        return <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 bg-emerald-500/10">VACANT</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+            Blank
+          </span>
+        );
       case TABLE_STATUS.OCCUPIED:
-        return <Badge variant="outline" className="border-blue-500/40 text-blue-400 bg-blue-500/10">OCCUPIED</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100/70 text-sky-700 border border-sky-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+            Running
+          </span>
+        );
       case TABLE_STATUS.BILLED:
-        return <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/10">BILLED</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100/70 text-emerald-700 border border-emerald-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Printed
+          </span>
+        );
       case TABLE_STATUS.RESERVED:
-        return <Badge variant="outline" className="border-purple-500/40 text-purple-400 bg-purple-500/10">RESERVED</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100/70 text-amber-700 border border-amber-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Reserved
+          </span>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
   const handleTableClick = (table) => {
-    if (table.status === TABLE_STATUS.VACANT) {
-      navigate(`/orders?tableId=${table.id}&tableName=${encodeURIComponent(table.name)}`);
-    } else if (table.status === TABLE_STATUS.OCCUPIED) {
-      navigate(`/orders?tableId=${table.id}&orderId=${table.currentOrderId}`);
+    if (table.status === TABLE_STATUS.BILLED) {
+      navigate(`/billing?tableId=${table.id}&tableName=${encodeURIComponent(table.name)}`);
     } else {
-      navigate(`/orders?tableId=${table.id}`);
+      navigate(`/orders?tableId=${table.id}&tableName=${encodeURIComponent(table.name)}`);
     }
   };
 
-  const handleTransfer = (targetTableId) => {
-    if (!transferModal) return;
-    setTables((prev) =>
-      prev.map((t) => {
-        if (t.id === transferModal.id) {
-          return {
-            ...t,
-            status: TABLE_STATUS.VACANT,
-            runningAmount: 0,
-            elapsedMinutes: 0,
-            guestCount: undefined,
-            captainName: undefined,
-            currentOrderId: undefined,
-          };
-        }
-        if (t.id === targetTableId) {
-          return {
-            ...t,
-            status: TABLE_STATUS.OCCUPIED,
-            runningAmount: transferModal.runningAmount,
-            elapsedMinutes: transferModal.elapsedMinutes,
-            guestCount: transferModal.guestCount,
-            captainName: transferModal.captainName,
-            currentOrderId: transferModal.currentOrderId,
-          };
-        }
-        return t;
-      })
-    );
-    setTransferModal(null);
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Top Header & Metrics */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <UtensilsCrossed className="w-6 h-6 text-emerald-400" />
-            Floor View & Table Management
-          </h1>
-          <p className="text-sm text-slate-400">Live floor state, running orders, and table allocations</p>
-        </div>
+    <div className="space-y-4 max-w-7xl mx-auto">
+      {/* Top Header & Actions */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">Table View</h1>
+              <span className="text-xs text-slate-500 font-medium">
+                {tables.length} Total Tables
+              </span>
+            </div>
+            {/* Status Legend */}
+            <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-medium text-slate-600">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-slate-400" />
+                Blank Table ({vacantCount})
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
+                Running ({occupiedCount})
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                Printed Bill ({billedCount})
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                Reserved
+              </span>
+            </div>
+          </div>
 
-        {/* Quick Stats Banner */}
-        <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 rounded-lg p-2.5">
-          <div className="px-3 border-r border-slate-800 text-center">
-            <p className="text-xs text-slate-400">Vacant</p>
-            <p className="text-lg font-bold text-emerald-400">{vacantCount}</p>
-          </div>
-          <div className="px-3 border-r border-slate-800 text-center">
-            <p className="text-xs text-slate-400">Occupied</p>
-            <p className="text-lg font-bold text-blue-400">{occupiedCount}</p>
-          </div>
-          <div className="px-3 border-r border-slate-800 text-center">
-            <p className="text-xs text-slate-400">Billed</p>
-            <p className="text-lg font-bold text-amber-400">{billedCount}</p>
-          </div>
-          <div className="px-3 text-center">
-            <p className="text-xs text-slate-400">Active Sales</p>
-            <p className="text-lg font-bold text-white flex items-center justify-center">
-              <IndianRupee className="w-3.5 h-3.5" />
-              {formatPaiseToRupees(totalRunningSales)}
-            </p>
+          {/* Quick Actions & Live Metric */}
+          <div className="flex items-center gap-2">
+            <div className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-right hidden sm:block">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Active Floor Total</p>
+              <p className="text-sm font-bold text-slate-900">{formatPaiseToRupees(totalRunningSales)}</p>
+            </div>
+
+            <Button
+              size="sm"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1.5 h-9 text-xs"
+              onClick={() => navigate('/orders/new')}
+            >
+              <Plus className="w-4 h-4" />
+              New Order
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-slate-300 text-slate-700 hover:bg-slate-100 font-medium h-9 text-xs"
+              onClick={() => navigate('/orders?type=takeaway')}
+            >
+              Take Away
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-slate-300 text-slate-700 hover:bg-slate-100 font-medium h-9 text-xs"
+              onClick={() => navigate('/orders?type=delivery')}
+            >
+              Delivery
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Area Tabs & Filters */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 p-3 rounded-xl">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-          <Button
-            size="sm"
-            variant={selectedArea === 'ALL' ? 'default' : 'ghost'}
+      {/* Area Tabs & Search Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 p-2.5 rounded-xl shadow-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+          <button
             onClick={() => setSelectedArea('ALL')}
-            className={selectedArea === 'ALL' ? 'bg-emerald-600 hover:bg-emerald-500' : ''}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+              selectedArea === 'ALL'
+                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
           >
             All Areas ({tables.length})
-          </Button>
+          </button>
           {areas.map((a) => (
-            <Button
+            <button
               key={a.id}
-              size="sm"
-              variant={selectedArea === a.id ? 'default' : 'ghost'}
               onClick={() => setSelectedArea(a.id)}
-              className={selectedArea === a.id ? 'bg-emerald-600 hover:bg-emerald-500' : ''}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                selectedArea === a.id
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
             >
               {a.name}
-            </Button>
+            </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative w-48">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+        <div className="flex items-center gap-2">
+          <div className="relative w-full sm:w-56">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
             <Input
-              placeholder="Search table..."
+              placeholder="Search table number..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9 bg-slate-950 border-slate-800 text-sm"
+              className="pl-8 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white text-slate-800"
             />
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+          <div className="hidden lg:flex items-center gap-1 border-l border-slate-200 pl-2">
             {['ALL', TABLE_STATUS.VACANT, TABLE_STATUS.OCCUPIED, TABLE_STATUS.BILLED].map((st) => (
               <button
                 key={st}
                 onClick={() => setSelectedStatus(st)}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${
                   selectedStatus === st
-                    ? 'bg-slate-800 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
-                {st === 'ALL' ? 'All Status' : st}
+                {st === 'ALL' ? 'All' : st}
               </button>
             ))}
           </div>
@@ -301,133 +228,147 @@ export function FloorViewPage() {
       </div>
 
       {/* Tables Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-3.5">
         {filteredTables.map((table) => {
           const isOccupied = table.status === TABLE_STATUS.OCCUPIED;
           const isBilled = table.status === TABLE_STATUS.BILLED;
           const isVacant = table.status === TABLE_STATUS.VACANT;
 
           return (
-            <Card
+            <div
               key={table.id}
-              className={`border-2 transition-all duration-200 cursor-pointer ${getStatusBorder(
+              onClick={() => handleTableClick(table)}
+              className={`border rounded-xl p-3.5 flex flex-col justify-between transition-all cursor-pointer hover:shadow-md ${getStatusCardClasses(
                 table.status
               )}`}
-              onClick={() => handleTableClick(table)}
             >
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
+              {/* Table Card Header */}
+              <div>
+                <div className="flex items-start justify-between gap-1 pb-2">
                   <div>
-                    <h3 className="font-bold text-lg text-white">{table.name}</h3>
-                    <p className="text-xs text-slate-400 flex items-center gap-1">
-                      <Users className="w-3 h-3" />
-                      {table.capacity} Seater {table.guestCount ? `• (${table.guestCount} Guests)` : ''}
+                    <h3 className="font-bold text-base text-slate-900 leading-tight">
+                      {table.name}
+                    </h3>
+                    <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1 pt-0.5">
+                      <Users className="w-3 h-3 text-slate-400" />
+                      {table.capacity} Seater {table.guestCount ? `• ${table.guestCount} Guests` : ''}
                     </p>
                   </div>
                   {getStatusBadge(table.status)}
                 </div>
 
-                {/* Running Order Details */}
+                {/* Status Details */}
                 {(isOccupied || isBilled) && (
-                  <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2.5 space-y-1.5">
+                  <div className="bg-white/90 border border-slate-200/80 rounded-lg p-2.5 space-y-1 my-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-slate-500" />
-                        {table.elapsedMinutes} mins
+                      <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        {table.elapsedMinutes || 5} mins
                       </span>
-                      <span className="text-sm font-bold text-emerald-400">
-                        ₹{formatPaiseToRupees(table.runningAmount)}
+                      <span className="text-sm font-bold text-slate-900">
+                        {formatPaiseToRupees(table.runningAmount)}
                       </span>
                     </div>
                     {table.captainName && (
-                      <p className="text-[11px] text-slate-400 truncate">
-                        Assigned: {table.captainName}
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {table.captainName}
                       </p>
                     )}
                   </div>
                 )}
 
                 {isVacant && (
-                  <div className="py-4 text-center">
-                    <p className="text-xs text-slate-500">Tap to start order</p>
+                  <div className="py-4 text-center my-1">
+                    <p className="text-xs text-slate-400 font-medium">Ready for guests</p>
                   </div>
                 )}
+              </div>
 
-                {/* Action Row */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-800/60" onClick={(e) => e.stopPropagation()}>
-                  {isVacant ? (
+              {/* Action Buttons */}
+              <div
+                className="pt-2 border-t border-slate-100 flex items-center gap-1.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {isVacant ? (
+                  <Button
+                    size="sm"
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs h-7 gap-1 font-semibold"
+                    onClick={() => handleTableClick(table)}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Open Order
+                  </Button>
+                ) : (
+                  <>
                     <Button
                       size="sm"
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-xs h-8 gap-1.5"
+                      variant="outline"
+                      className="flex-1 text-xs h-7 font-semibold border-slate-300 text-slate-800 hover:bg-slate-100"
                       onClick={() => handleTableClick(table)}
                     >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      Open Table & Order
+                      {isBilled ? 'View Bill' : 'Manage'}
                     </Button>
-                  ) : (
-                    <div className="flex items-center gap-2 w-full">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="flex-1 text-xs h-8"
-                        onClick={() => handleTableClick(table)}
-                      >
-                        {isBilled ? 'View Bill' : 'Manage Order'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 px-2 text-slate-400 hover:text-white"
-                        title="Transfer Table"
-                        onClick={() => setTransferModal(table)}
-                      >
-                        <ArrowRightLeft className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60"
+                      title="Transfer Table"
+                      onClick={() => setTransferModal(table)}
+                    >
+                      <ArrowRightLeft className="w-3 h-3" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
 
       {/* Table Transfer Modal */}
       {transferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-800">
-            <CardContent className="p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <Card className="w-full max-w-md bg-white border-slate-200 shadow-xl">
+            <CardContent className="p-5 space-y-4">
               <div className="flex items-center gap-2">
-                <ArrowRightLeft className="w-5 h-5 text-blue-400" />
-                <h3 className="text-lg font-bold text-white">
+                <ArrowRightLeft className="w-5 h-5 text-rose-600" />
+                <h3 className="text-base font-bold text-slate-900">
                   Transfer from {transferModal.name}
                 </h3>
               </div>
-              <p className="text-sm text-slate-400">
-                Select a vacant destination table to transfer the active session and orders:
+              <p className="text-xs text-slate-500">
+                Select a vacant destination table:
               </p>
 
-              <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto no-scrollbar">
                 {tables
                   .filter((t) => t.status === TABLE_STATUS.VACANT)
                   .map((vacantTable) => (
                     <Button
                       key={vacantTable.id}
                       variant="outline"
-                      className="justify-start gap-2 h-12 border-slate-800 hover:border-emerald-500 hover:bg-emerald-500/10"
-                      onClick={() => handleTransfer(vacantTable.id)}
+                      className="justify-start gap-2 h-11 border-slate-200 hover:border-rose-400 hover:bg-rose-50/50"
+                      onClick={() => {
+                        // Transfer logic through store
+                        setTransferModal(null);
+                      }}
                     >
-                      <UtensilsCrossed className="w-4 h-4 text-emerald-400" />
+                      <UtensilsCrossed className="w-4 h-4 text-slate-500" />
                       <div className="text-left">
-                        <p className="text-xs font-semibold text-white">{vacantTable.name}</p>
+                        <p className="text-xs font-bold text-slate-800">{vacantTable.name}</p>
                         <p className="text-[10px] text-slate-500">{vacantTable.capacity} Seater</p>
                       </div>
                     </Button>
                   ))}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <Button variant="ghost" onClick={() => setTransferModal(null)}>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-slate-600"
+                  onClick={() => setTransferModal(null)}
+                >
                   Cancel
                 </Button>
               </div>

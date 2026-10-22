@@ -16,10 +16,11 @@ export const outletSchema = z.object({
     line2: z.string().optional(),
     city: z.string().min(1, 'City is required'),
     state: z.string().min(1, 'State is required'),
-    stateCode: z.string().min(2).max(2), // Indian state code (e.g. 27 for Maharashtra)
+    stateCode: z.string().min(2).max(2).default('27'), // Indian state code (e.g. 27 for Maharashtra)
     pincode: z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits'),
   }),
   logoUrl: z.string().optional(),
+  upiId: z.string().optional().or(z.literal('')),
   isSetupCompleted: z.boolean().default(false),
   currency: z.string().default('INR'),
   timezone: z.string().default('Asia/Kolkata'),
@@ -31,7 +32,18 @@ export const outletSchema = z.object({
     .optional(),
 });
 
-export const updateOutletSchema = outletSchema.partial();
+export const updateOutletSchema = outletSchema.partial().extend({
+  address: z
+    .object({
+      line1: z.string().optional(),
+      line2: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      stateCode: z.string().min(2).max(2).default('27').optional().or(z.literal('')),
+      pincode: z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits').optional(),
+    })
+    .optional(),
+});
 
 export const taxGroupSchema = z.object({
   name: z.string().min(1, 'Tax group name is required'),

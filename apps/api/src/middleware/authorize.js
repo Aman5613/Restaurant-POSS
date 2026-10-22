@@ -18,18 +18,26 @@ export function authorize({ roles = [], permission = null } = {}) {
       });
     }
 
-    // Super-admin always bypasses role/permission checks
+    // Super-admin always bypasses all checks
     if (user.role === ROLES.SUPER_ADMIN) {
       return;
     }
 
-    // Role check
-    if (roles.length > 0 && !roles.includes(user.role)) {
-      return reply.status(403).send({
-        code: 'FORBIDDEN',
-        message: `Forbidden: role '${user.role}' not permitted`,
-        requestId: request.id,
-      });
+    // Explicit role restriction check
+    if (roles.length > 0) {
+      if (!roles.includes(user.role)) {
+        return reply.status(403).send({
+          code: 'FORBIDDEN',
+          message: `Forbidden: role '${user.role}' not permitted`,
+          requestId: request.id,
+        });
+      }
+      return;
+    }
+
+    // Admin or 'all' permission bypasses generic permission checks
+    if (user.role === ROLES.ADMIN || (user.permissions || []).includes('all')) {
+      return;
     }
 
     // Permission check
