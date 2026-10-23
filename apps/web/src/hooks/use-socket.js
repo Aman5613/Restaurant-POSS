@@ -136,29 +136,38 @@ export function useSocket() {
 
     function onKotDispatched(data) {
       const currentUser = userRef.current;
-      if (currentUser?.role === 'cook' || currentUser?.role === 'manager') {
+      if (currentUser?.role === 'cook' || currentUser?.role === 'manager' || !currentUser?.role) {
         playKotChime();
       }
 
-      if (data?.createdKots && Array.isArray(data.createdKots)) {
+      const rawKots = data?.createdKots
+        ? data.createdKots
+        : data?.kot
+          ? [data.kot]
+          : Array.isArray(data)
+            ? data
+            : [];
+
+      if (rawKots.length > 0) {
         const store = usePosStore.getState();
         const currentKots = store.kots || [];
-        const newKots = data.createdKots.filter(
-          (nk) => !currentKots.some((ck) => ck.id === (nk._id || nk.id))
+        const newKots = rawKots.filter(
+          (nk) => !currentKots.some((ck) => (ck.id || ck._id) === (nk.id || nk._id))
         );
         if (newKots.length > 0) {
           const mapped = newKots.map((k) => ({
             id: k._id || k.id,
-            kotNo: k.kot_no,
-            orderNo: k.order_no,
-            tableId: k.table_id,
-            tableName: k.table_name,
-            stationId: k.station_id,
-            stationName: k.station_name,
-            lines: k.lines || [],
-            items: k.lines || [],
+            kotNo: k.kotNo || k.kot_no,
+            orderNo: k.orderNo || k.order_no,
+            tableId: k.tableId || k.table_id,
+            tableName: k.tableName || k.table_name || 'Table',
+            stationId: k.stationId || k.station_id || 'st_1',
+            stationName: k.stationName || k.station_name || 'Main Kitchen',
+            lines: k.lines || k.items || [],
+            items: k.lines || k.items || [],
             status: k.status || 'PENDING',
             createdAt: k.createdAt || new Date().toISOString(),
+            timestamp: k.timestamp || Date.now(),
           }));
           usePosStore.setState({ kots: [...mapped, ...currentKots] });
         }
@@ -329,6 +338,19 @@ export function useSocket() {
     [user?.outletId, toggleItemAvailability]
   );
 
+  const broadcastKotDispatch = useCallback(
+    (kot) => {
+      if (socketInstance && kot) {
+        socketInstance.emit(SOCKET_EVENTS.KOT_DISPATCHED, {
+          kot,
+          createdKots: [kot],
+          outletId: user?.outletId || 'default-outlet',
+        });
+      }
+    },
+    [user?.outletId]
+  );
+
   return {
     socket: socketInstance,
     isConnected,
@@ -336,6 +358,7 @@ export function useSocket() {
     presence,
     broadcastOrder,
     broadcastTableTransfer,
+    broadcastKotDispatch,
     acknowledgeKot,
     markKotReady,
     broadcastTableUpdate,

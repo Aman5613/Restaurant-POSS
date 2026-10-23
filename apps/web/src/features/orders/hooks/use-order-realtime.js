@@ -31,11 +31,13 @@ export function useOrderRealtime(outletId, onEvent) {
 
     socket.on('order:updated', handleOrderEvent);
     socket.on('kot:created', handleKotEvent);
+    socket.on('kot:dispatched', handleKotEvent);
     socket.on('table:updated', handleTableEvent);
 
     return () => {
       socket.off('order:updated', handleOrderEvent);
       socket.off('kot:created', handleKotEvent);
+      socket.off('kot:dispatched', handleKotEvent);
       socket.off('table:updated', handleTableEvent);
     };
   }, [outletId, onEvent]);

@@ -45,7 +45,7 @@ export function OrderScreenPage() {
     setMenuCategories,
   } = usePosStore();
 
-  const { broadcastOrder } = useSocket();
+  const { broadcastOrder, broadcastKotDispatch } = useSocket();
 
   const currentTable = tables.find((t) => t.id === tableId);
   const tableName = paramTableName || currentTable?.name || 'Counter';
@@ -423,6 +423,10 @@ export function OrderScreenPage() {
       orderNo,
       lines: orderLines,
     });
+
+    if (kot) {
+      broadcastKotDispatch(kot);
+    }
 
     const nextLines = orderLines.map((l) =>
       l.status === 'DRAFT' || !l.status ? { ...l, status: 'SENT' } : l

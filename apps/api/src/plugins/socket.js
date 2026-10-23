@@ -148,10 +148,12 @@ async function socketPlugin(fastify, _opts) {
       if (!outletState.has(outletId)) {
         outletState.set(outletId, { orders: {}, tables: {}, kots: [] });
       }
-      if (data.createdKots && Array.isArray(data.createdKots)) {
-        outletState.get(outletId).kots.push(...data.createdKots);
+      const kotsToAdd = data.createdKots || (data.kot ? [data.kot] : []);
+      if (Array.isArray(kotsToAdd) && kotsToAdd.length > 0) {
+        outletState.get(outletId).kots.push(...kotsToAdd);
       }
       socket.to(`outlet:${outletId}`).emit(SOCKET_EVENTS.KOT_DISPATCHED, data);
+      socket.to(`outlet:${outletId}:kitchen`).emit(SOCKET_EVENTS.KOT_DISPATCHED, data);
     });
 
     // Kitchen acknowledgment flow

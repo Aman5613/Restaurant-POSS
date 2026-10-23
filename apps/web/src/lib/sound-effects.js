@@ -14,6 +14,22 @@ function getAudioContext() {
   return audioCtx;
 }
 
+export function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const unlockEvents = ['click', 'touchstart', 'keydown'];
+  const onUserInteraction = () => {
+    unlockAudio();
+    unlockEvents.forEach((evt) => window.removeEventListener(evt, onUserInteraction));
+  };
+  unlockEvents.forEach((evt) => window.addEventListener(evt, onUserInteraction, { once: true, passive: true }));
+}
+
 /**
  * Play a crisp kitchen bell chime when a new KOT arrives for cooks
  */
