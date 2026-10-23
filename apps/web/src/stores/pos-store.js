@@ -336,6 +336,14 @@ export const usePosStore = create((set, get) => ({
   kotCounter: loaded.kotCounter,
   orderCounter: loaded.orderCounter,
 
+  // Socket & Multi-device Presence State
+  presence: { count: 0, devices: [], room: '' },
+  socketId: null,
+  isSocketConnected: false,
+
+  setPresence: (presence) => set({ presence }),
+  setSocketStatus: (isSocketConnected, socketId) => set({ isSocketConnected, socketId }),
+
   setOutlet: (outlet) => {
     set((state) => {
       const next = { ...state, outlet };
@@ -649,6 +657,85 @@ export const usePosStore = create((set, get) => ({
         return t;
       });
       const next = { ...state, tables: newTables };
+      saveState(next);
+      return next;
+    });
+  },
+
+  // Transfer active table to vacant destination table
+  transferTable: (sourceTableId, targetTableId) => {
+    set((state) => {
+      const sourceTable = state.tables.find(
+        (t) => t.id === sourceTableId || t._id === sourceTableId
+      );
+      const targetTable = state.tables.find(
+        (t) => t.id === targetTableId || t._id === targetTableId
+      );
+      if (!sourceTable || !targetTable) return state;
+
+      const sId = sourceTable.id || sourceTable._id;
+      const tId = targetTable.id || targetTable._id;
+
+      // 1. Move active order from source to target
+      const newOrders = { ...state.orders };
+      const sourceOrder = newOrders[sId];
+
+      if (sourceOrder) {
+        newOrders[tId] = {
+          ...sourceOrder,
+          tableId: tId,
+          tableName: targetTable.name,
+          updatedAt: new Date().toISOString(),
+        };
+        delete newOrders[sId];
+      }
+
+      // 2. Update active KOTs pointing to source table
+      const updatedKots = state.kots.map((k) => {
+        if (k.tableId === sId) {
+          return {
+            ...k,
+            tableId: tId,
+            tableName: targetTable.name,
+          };
+        }
+        return k;
+      });
+
+      // 3. Update tables status and values
+      const updatedTables = state.tables.map((t) => {
+        const curId = t.id || t._id;
+        if (curId === tId) {
+          return {
+            ...t,
+            status: sourceTable.status,
+            runningAmount: sourceTable.runningAmount || 0,
+            elapsedMinutes: sourceTable.elapsedMinutes || 1,
+            guestCount: sourceTable.guestCount,
+            captainName: sourceTable.captainName,
+            currentOrderId: sourceTable.currentOrderId,
+          };
+        }
+        if (curId === sId) {
+          return {
+            ...t,
+            status: TABLE_STATUS.VACANT,
+            runningAmount: 0,
+            elapsedMinutes: 0,
+            guestCount: undefined,
+            captainName: undefined,
+            currentOrderId: null,
+          };
+        }
+        return t;
+      });
+
+      const next = {
+        ...state,
+        orders: newOrders,
+        tables: updatedTables,
+        kots: updatedKots,
+      };
       saveState(next);
       return next;
     });

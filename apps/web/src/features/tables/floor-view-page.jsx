@@ -15,10 +15,13 @@ import {
 } from 'lucide-react';
 import { formatPaiseToRupees, TABLE_STATUS } from '@pos/shared';
 import { usePosStore } from '@/stores/pos-store';
+import { apiClient } from '@/lib/api-client';
+import { useSocket } from '@/hooks/use-socket';
 
 export function FloorViewPage() {
   const navigate = useNavigate();
-  const { tables, areas: storeAreas } = usePosStore();
+  const { tables, areas: storeAreas, transferTable } = usePosStore();
+  const { broadcastTableTransfer } = useSocket();
   const [selectedArea, setSelectedArea] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -57,6 +60,31 @@ export function FloorViewPage() {
       default:
         return 'bg-white border-slate-200';
     }
+  };
+
+  const handleTransfer = async (targetTable) => {
+    if (!transferModal || !targetTable) return;
+    const sourceTableId = transferModal.id;
+    const targetTableId = targetTable.id;
+
+    // 1. Move table state & orders in POS store
+    transferTable(sourceTableId, targetTableId);
+
+    // 2. Broadcast transfer to all connected devices in real time
+    broadcastTableTransfer(sourceTableId, targetTableId);
+
+    // 3. Sync transfer to backend API if online
+    try {
+      await apiClient.post('/v1/tables/transfer', {
+        sourceTableId,
+        targetTableId,
+        reason: 'Customer requested table shift',
+      }).catch(() => null);
+    } catch (_err) {
+      // offline fallback
+    }
+
+    setTransferModal(null);
   };
 
   const getStatusBadge = (status) => {
@@ -341,25 +369,28 @@ export function FloorViewPage() {
               </p>
 
               <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto no-scrollbar">
-                {tables
-                  .filter((t) => t.status === TABLE_STATUS.VACANT)
-                  .map((vacantTable) => (
-                    <Button
-                      key={vacantTable.id}
-                      variant="outline"
-                      className="justify-start gap-2 h-11 border-slate-200 hover:border-rose-400 hover:bg-rose-50/50"
-                      onClick={() => {
-                        // Transfer logic through store
-                        setTransferModal(null);
-                      }}
-                    >
-                      <UtensilsCrossed className="w-4 h-4 text-slate-500" />
-                      <div className="text-left">
-                        <p className="text-xs font-bold text-slate-800">{vacantTable.name}</p>
-                        <p className="text-[10px] text-slate-500">{vacantTable.capacity} Seater</p>
-                      </div>
-                    </Button>
-                  ))}
+                {tables.filter((t) => t.status === TABLE_STATUS.VACANT).length === 0 ? (
+                  <p className="col-span-2 text-center text-xs text-slate-500 py-6">
+                    No vacant tables available to transfer to.
+                  </p>
+                ) : (
+                  tables
+                    .filter((t) => t.status === TABLE_STATUS.VACANT)
+                    .map((vacantTable) => (
+                      <Button
+                        key={vacantTable.id}
+                        variant="outline"
+                        className="justify-start gap-2 h-11 border-slate-200 hover:border-rose-400 hover:bg-rose-50/50"
+                        onClick={() => handleTransfer(vacantTable)}
+                      >
+                        <UtensilsCrossed className="w-4 h-4 text-slate-500" />
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-slate-800">{vacantTable.name}</p>
+                          <p className="text-[10px] text-slate-500">{vacantTable.capacity} Seater</p>
+                        </div>
+                      </Button>
+                    ))
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">

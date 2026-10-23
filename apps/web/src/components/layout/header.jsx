@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Store,
   Menu,
+  Radio,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuthStore, ROLE_PROFILES } from '@/stores/auth-store';
@@ -56,11 +57,12 @@ export function Header() {
   const navigate = useNavigate();
   const { user, clearAuth, hasRole, quickLoginRole } = useAuthStore();
   const toggleMobileSidebar = useUiStore((s) => s.toggleMobileSidebar);
-  const { outlet, setOutlet } = usePosStore();
+  const { outlet, setOutlet, presence, socketId, isSocketConnected } = usePosStore();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [showPresenceMenu, setShowPresenceMenu] = useState(false);
 
   useEffect(() => {
     if (!outlet) {
@@ -212,6 +214,98 @@ export function Header() {
               Offline
             </span>
           )}
+
+          {/* Multi-Device Socket Presence Badge & Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowPresenceMenu(!showPresenceMenu)}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer shadow-xs",
+                isSocketConnected
+                  ? (presence?.count > 1
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                      : "bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100")
+                  : "bg-slate-100 text-slate-500 border-slate-200"
+              )}
+              title="Click to view all connected devices in this socket room"
+            >
+              <Radio className={cn("h-3 w-3", isSocketConnected ? "text-emerald-500 animate-pulse" : "text-slate-400")} />
+              <span>
+                {isSocketConnected
+                  ? `${presence?.count || 1} Device${(presence?.count || 1) > 1 ? 's' : ''}`
+                  : "Offline Sync"}
+              </span>
+            </button>
+
+            {showPresenceMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowPresenceMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-3 animate-in fade-in zoom-in-95 text-left">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Connected Devices</p>
+                      <p className="text-[10px] text-slate-500 font-mono truncate max-w-[170px]">
+                        Room: {presence?.room || `outlet:${outlet?.id || 'default-outlet'}`}
+                      </p>
+                    </div>
+                    <span className={cn(
+                      "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                      presence?.count > 1 ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"
+                    )}>
+                      {presence?.count > 1 ? 'Live Multi-Sync' : 'Live Room'}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 space-y-1.5 max-h-52 overflow-y-auto">
+                    {presence?.devices?.length > 0 ? (
+                      presence.devices.map((dev) => {
+                        const isThisDevice = dev.socketId === socketId;
+                        return (
+                          <div
+                            key={dev.socketId}
+                            className={cn(
+                              "p-2 rounded-lg text-xs flex items-center justify-between border",
+                              isThisDevice
+                                ? "bg-rose-50/60 border-rose-200"
+                                : "bg-slate-50 border-slate-200"
+                            )}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <p className="font-semibold text-slate-800 flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                                <span className="truncate">{dev.deviceName}</span>
+                                {isThisDevice && (
+                                  <span className="text-[9px] px-1 py-0.2 bg-rose-600 text-white rounded font-bold uppercase">
+                                    You
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[10px] text-slate-500 capitalize">
+                                {dev.role || 'Staff'} • Socket #{dev.socketId ? dev.socketId.slice(0, 6) : ''}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="p-2 text-center text-xs text-slate-500">
+                        {isSocketConnected ? '1 Device Connected (This browser)' : 'Connecting to socket server...'}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Auto-syncs orders & tables</span>
+                    <span className="font-mono text-slate-500">ID: #{socketId ? socketId.slice(0, 5) : '...'}</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {pendingCount > 0 && (
             <Badge variant="secondary" className="text-xs bg-amber-50 text-amber-800 border border-amber-200">

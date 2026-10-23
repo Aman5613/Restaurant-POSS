@@ -24,6 +24,7 @@ import {
 import { formatPaiseToRupees, ORDER_TYPES } from '@pos/shared';
 import { usePosStore } from '@/stores/pos-store';
 import { apiClient } from '@/lib/api-client';
+import { useSocket } from '@/hooks/use-socket';
 
 export function OrderScreenPage() {
   const [searchParams] = useSearchParams();
@@ -43,6 +44,8 @@ export function OrderScreenPage() {
     setMenuItems,
     setMenuCategories,
   } = usePosStore();
+
+  const { broadcastOrder } = useSocket();
 
   const currentTable = tables.find((t) => t.id === tableId);
   const tableName = paramTableName || currentTable?.name || 'Counter';
@@ -248,7 +251,7 @@ export function OrderScreenPage() {
 
   const updateStore = (nextLines, nextGuests = guestCount, currentOrderType = orderType) => {
     setOrderLines(nextLines);
-    saveTableOrder(tableId, {
+    const orderPayload = {
       tableName,
       guestCount: nextGuests,
       orderType: currentOrderType,
@@ -256,6 +259,17 @@ export function OrderScreenPage() {
       customerName: deliveryCustomer.name,
       customerPhone: deliveryCustomer.phone,
       deliveryAddress: deliveryCustomer.address,
+    };
+    saveTableOrder(tableId, orderPayload);
+    broadcastOrder(tableId, {
+      ...orderPayload,
+      tableId,
+      totalAmount: nextLines.reduce(
+        (acc, l) =>
+          acc +
+          (l.unitPrice + ((l.addons || []).reduce((s, a) => s + (a.price || 0), 0))) * l.quantity,
+        0
+      ),
     });
   };
 

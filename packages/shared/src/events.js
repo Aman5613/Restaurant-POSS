@@ -34,6 +34,8 @@ export const SOCKET_EVENTS = {
   // Rooms & Connection
   JOIN_OUTLET: 'join:outlet',
   LEAVE_OUTLET: 'leave:outlet',
+  PRESENCE_SYNC: 'presence:sync',
+  SYNC_STATE: 'sync:state',
 
   // Order & KOT Flow
   ORDER_CREATED: 'order:created',
@@ -45,6 +47,7 @@ export const SOCKET_EVENTS = {
 
   // Floor & Billing
   TABLE_UPDATED: 'table:updated',
+  TABLE_TRANSFERRED: 'table:transferred',
   BILL_SETTLED: 'bill:settled',
 
   // Catalog

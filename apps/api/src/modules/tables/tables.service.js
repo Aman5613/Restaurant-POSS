@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Area, DiningTable, TableSession } from '../../models/index.js';
 import { TABLE_STATUS } from '@pos/shared';
 
@@ -97,9 +98,14 @@ export class TablesService {
   }
 
   async transferTable(outletId, { sourceTableId, targetTableId, reason: _reason }) {
+    const isSourceOid = mongoose.Types.ObjectId.isValid(sourceTableId);
+    const isTargetOid = mongoose.Types.ObjectId.isValid(targetTableId);
+    const sourceQuery = isSourceOid ? { _id: sourceTableId, outletId } : { id: sourceTableId, outletId };
+    const targetQuery = isTargetOid ? { _id: targetTableId, outletId } : { id: targetTableId, outletId };
+
     const [source, target] = await Promise.all([
-      DiningTable.findOne({ _id: sourceTableId, outletId }),
-      DiningTable.findOne({ _id: targetTableId, outletId }),
+      DiningTable.findOne(sourceQuery),
+      DiningTable.findOne(targetQuery),
     ]);
 
     if (!source || !target) {
