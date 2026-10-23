@@ -480,13 +480,12 @@ export function ManagerPage() {
       {/* Toast Notification */}
       {notification && (
         <div
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg border transition-all animate-in fade-in slide-in-from-top-2 ${
-            notification.type === 'warning'
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg border transition-all animate-in fade-in slide-in-from-top-2 ${notification.type === 'warning'
               ? 'bg-amber-50 text-amber-900 border-amber-300'
               : notification.type === 'info'
-              ? 'bg-slate-900 text-white border-slate-800'
-              : 'bg-emerald-50 text-emerald-900 border-emerald-300'
-          }`}
+                ? 'bg-slate-900 text-white border-slate-800'
+                : 'bg-emerald-50 text-emerald-900 border-emerald-300'
+            }`}
         >
           {notification.type === 'warning' ? (
             <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
@@ -540,11 +539,10 @@ export function ManagerPage() {
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('items')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'items'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'items'
               ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
+            }`}
         >
           <UtensilsCrossed className="w-4 h-4" />
           Menu Items ({items.length})
@@ -552,11 +550,10 @@ export function ManagerPage() {
 
         <button
           onClick={() => setActiveTab('categories')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'categories'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'categories'
               ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
+            }`}
         >
           <Layers className="w-4 h-4" />
           Categories ({categories.length})
@@ -564,11 +561,10 @@ export function ManagerPage() {
 
         <button
           onClick={() => setActiveTab('floors-tables')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'floors-tables'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'floors-tables'
               ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
+            }`}
         >
           <Grid3X3 className="w-4 h-4" />
           Floors & Tables ({tables.length})
@@ -576,11 +572,10 @@ export function ManagerPage() {
 
         <button
           onClick={() => setActiveTab('day-ops')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'day-ops'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'day-ops'
               ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
+            }`}
         >
           <CalendarDays className="w-4 h-4" />
           Day Ops & Register ({dayOps?.status || 'OPEN'})
@@ -588,11 +583,10 @@ export function ManagerPage() {
 
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'dashboard'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'dashboard'
               ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
+            }`}
         >
           <TrendingUp className="w-4 h-4" />
           Manager Overview
@@ -600,11 +594,10 @@ export function ManagerPage() {
 
         <button
           onClick={() => setActiveTab('watchlist')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'watchlist'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'watchlist'
               ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
+            }`}
         >
           <AlertCircle className="w-4 h-4" />
           86 Out of Stock ({dashboardStats.outOfStockCount})
@@ -815,25 +808,22 @@ export function ManagerPage() {
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
                 <button
                   onClick={() => setDietFilter('ALL')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                    dietFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${dietFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                    }`}
                 >
                   All Food
                 </button>
                 <button
                   onClick={() => setDietFilter('VEG')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                    dietFilter === 'VEG' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${dietFilter === 'VEG' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
+                    }`}
                 >
                   🟢 Veg
                 </button>
                 <button
                   onClick={() => setDietFilter('NON_VEG')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                    dietFilter === 'NON_VEG' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${dietFilter === 'NON_VEG' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600'
+                    }`}
                 >
                   🔴 Non-Veg
                 </button>
@@ -843,25 +833,22 @@ export function ManagerPage() {
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
                 <button
                   onClick={() => setStockFilter('ALL')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                    stockFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${stockFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                    }`}
                 >
                   All Stock
                 </button>
                 <button
                   onClick={() => setStockFilter('IN_STOCK')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                    stockFilter === 'IN_STOCK' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${stockFilter === 'IN_STOCK' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
+                    }`}
                 >
                   In Stock
                 </button>
                 <button
                   onClick={() => setStockFilter('OUT_OF_STOCK')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                    stockFilter === 'OUT_OF_STOCK' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${stockFilter === 'OUT_OF_STOCK' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600'
+                    }`}
                 >
                   86 (Out)
                 </button>
@@ -872,11 +859,10 @@ export function ManagerPage() {
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
               <button
                 onClick={() => setSelectedCategory('ALL')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedCategory === 'ALL'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${selectedCategory === 'ALL'
                     ? 'bg-rose-50 text-rose-700 border border-rose-200'
                     : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 All Categories ({items.length})
               </button>
@@ -886,11 +872,10 @@ export function ManagerPage() {
                   <button
                     key={c.id}
                     onClick={() => setSelectedCategory(c.id)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                      selectedCategory === c.id
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${selectedCategory === c.id
                         ? 'bg-rose-50 text-rose-700 border border-rose-200'
                         : 'text-slate-600 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {c.name} ({count})
                   </button>
@@ -904,11 +889,10 @@ export function ManagerPage() {
             {filteredItems.map((item) => (
               <Card
                 key={item.id}
-                className={`bg-white border transition-all ${
-                  !item.isAvailable
+                className={`bg-white border transition-all ${!item.isAvailable
                     ? 'border-dashed border-rose-200 bg-rose-50/20 opacity-80'
                     : 'border-slate-200 hover:border-slate-300 shadow-xs'
-                }`}
+                  }`}
               >
                 <CardHeader className="p-4 pb-2">
                   <div className="flex items-start justify-between gap-2">
@@ -916,14 +900,12 @@ export function ManagerPage() {
                       <div className="flex items-center gap-2">
                         {/* Food Type Indicator */}
                         <span
-                          className={`h-3.5 w-3.5 rounded-sm border flex items-center justify-center p-0.5 flex-shrink-0 ${
-                            item.isVeg ? 'border-emerald-600' : 'border-rose-600'
-                          }`}
+                          className={`h-3.5 w-3.5 rounded-sm border flex items-center justify-center p-0.5 flex-shrink-0 ${item.isVeg ? 'border-emerald-600' : 'border-rose-600'
+                            }`}
                         >
                           <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              item.isVeg ? 'bg-emerald-600' : 'bg-rose-600'
-                            }`}
+                            className={`h-1.5 w-1.5 rounded-full ${item.isVeg ? 'bg-emerald-600' : 'bg-rose-600'
+                              }`}
                           />
                         </span>
                         <h3 className="font-bold text-sm text-slate-900 leading-tight truncate">
@@ -992,11 +974,10 @@ export function ManagerPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className={`h-7 px-2 text-xs font-semibold ${
-                        item.isAvailable
+                      className={`h-7 px-2 text-xs font-semibold ${item.isAvailable
                           ? 'border-slate-200 text-slate-600 hover:text-rose-700 hover:bg-rose-50'
                           : 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                      }`}
+                        }`}
                       onClick={() => handleToggleStock(item)}
                       title={item.isAvailable ? 'Mark as Out of Stock (86)' : 'Restore to stock'}
                     >
@@ -1080,9 +1061,8 @@ export function ManagerPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`h-3 w-3 rounded-full ${
-                              item.isVeg ? 'bg-emerald-500' : 'bg-rose-500'
-                            }`}
+                            className={`h-3 w-3 rounded-full ${item.isVeg ? 'bg-emerald-500' : 'bg-rose-500'
+                              }`}
                           />
                           <h4 className="font-bold text-sm text-slate-900">{item.name}</h4>
                         </div>
@@ -1412,9 +1392,8 @@ export function ManagerPage() {
                         type="button"
                         size="sm"
                         variant={formIsVeg ? 'default' : 'outline'}
-                        className={`h-9 flex-1 text-xs ${
-                          formIsVeg ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-200'
-                        }`}
+                        className={`h-9 flex-1 text-xs ${formIsVeg ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-200'
+                          }`}
                         onClick={() => setFormIsVeg(true)}
                       >
                         🟢 Veg
@@ -1423,9 +1402,8 @@ export function ManagerPage() {
                         type="button"
                         size="sm"
                         variant={!formIsVeg ? 'default' : 'outline'}
-                        className={`h-9 flex-1 text-xs ${
-                          !formIsVeg ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'border-slate-200'
-                        }`}
+                        className={`h-9 flex-1 text-xs ${!formIsVeg ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'border-slate-200'
+                          }`}
                         onClick={() => setFormIsVeg(false)}
                       >
                         🔴 Non-Veg
@@ -1740,9 +1718,8 @@ export function ManagerPage() {
                         type="button"
                         size="sm"
                         variant={formIsVeg ? 'default' : 'outline'}
-                        className={`h-9 flex-1 text-xs ${
-                          formIsVeg ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-200'
-                        }`}
+                        className={`h-9 flex-1 text-xs ${formIsVeg ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-200'
+                          }`}
                         onClick={() => setFormIsVeg(true)}
                       >
                         🟢 Veg
@@ -1751,9 +1728,8 @@ export function ManagerPage() {
                         type="button"
                         size="sm"
                         variant={!formIsVeg ? 'default' : 'outline'}
-                        className={`h-9 flex-1 text-xs ${
-                          !formIsVeg ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'border-slate-200'
-                        }`}
+                        className={`h-9 flex-1 text-xs ${!formIsVeg ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'border-slate-200'
+                          }`}
                         onClick={() => setFormIsVeg(false)}
                       >
                         🔴 Non-Veg

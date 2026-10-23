@@ -19,10 +19,10 @@ function getDeviceLabel(user) {
   const browser = ua.includes('Chrome')
     ? 'Chrome'
     : ua.includes('Safari')
-    ? 'Safari'
-    : ua.includes('Firefox')
-    ? 'Firefox'
-    : 'Browser';
+      ? 'Safari'
+      : ua.includes('Firefox')
+        ? 'Firefox'
+        : 'Browser';
   return `${deviceType} - ${browser} (${user?.name || user?.role || 'Staff'})`;
 }
 

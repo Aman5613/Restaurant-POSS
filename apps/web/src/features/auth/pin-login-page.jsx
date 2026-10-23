@@ -134,11 +134,10 @@ export function PinLoginPage() {
               {[0, 1, 2, 3].map((idx) => (
                 <div
                   key={idx}
-                  className={`h-3.5 w-3.5 rounded-full border transition-all duration-150 ${
-                    pin.length > idx
+                  className={`h-3.5 w-3.5 rounded-full border transition-all duration-150 ${pin.length > idx
                       ? 'bg-rose-600 border-rose-600 scale-125 shadow-xs'
                       : 'bg-slate-100 border-slate-300'
-                  }`}
+                    }`}
                 />
               ))}
             </div>

@@ -72,7 +72,7 @@ export function Header() {
           const o = res?.data?.outlet || res?.data;
           if (o) setOutlet(o);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [outlet, setOutlet]);
 
@@ -224,8 +224,8 @@ export function Header() {
                 "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer shadow-xs",
                 isSocketConnected
                   ? (presence?.count > 1
-                      ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
-                      : "bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100")
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                    : "bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100")
                   : "bg-slate-100 text-slate-500 border-slate-200"
               )}
               title="Click to view all connected devices in this socket room"
@@ -347,9 +347,8 @@ export function Header() {
                   key={key}
                   type="button"
                   onClick={() => handleSwitchRole(key)}
-                  className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-slate-50 transition-colors ${
-                    user?.role === key ? 'bg-rose-50/70 text-rose-700 font-bold' : 'text-slate-700'
-                  }`}
+                  className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-slate-50 transition-colors ${user?.role === key ? 'bg-rose-50/70 text-rose-700 font-bold' : 'text-slate-700'
+                    }`}
                 >
                   <div>
                     <p className="capitalize font-semibold">{prof.role}</p>

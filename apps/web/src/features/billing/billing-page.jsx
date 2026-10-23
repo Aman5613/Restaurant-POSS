@@ -41,7 +41,7 @@ export function BillingPage() {
         const o = res?.data?.outlet || res?.data;
         if (o) setOutlet(o);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       isMounted = false;
     };
@@ -370,11 +370,10 @@ export function BillingPage() {
         <div className="grid grid-cols-4 gap-1.5 py-2.5 border-b border-slate-100">
           <button
             onClick={() => setPaymentMode('CASH')}
-            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
-              paymentMode === 'CASH'
+            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${paymentMode === 'CASH'
                 ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
+              }`}
           >
             <Banknote className="w-4 h-4 text-slate-700" />
             <span className="text-xs">Cash</span>
@@ -382,11 +381,10 @@ export function BillingPage() {
 
           <button
             onClick={() => setPaymentMode('UPI')}
-            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
-              paymentMode === 'UPI'
+            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${paymentMode === 'UPI'
                 ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
+              }`}
           >
             <QrCode className="w-4 h-4 text-slate-700" />
             <span className="text-xs">UPI QR</span>
@@ -394,11 +392,10 @@ export function BillingPage() {
 
           <button
             onClick={() => setPaymentMode('CARD')}
-            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
-              paymentMode === 'CARD'
+            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${paymentMode === 'CARD'
                 ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
+              }`}
           >
             <CreditCard className="w-4 h-4 text-slate-700" />
             <span className="text-xs">Card</span>
@@ -406,11 +403,10 @@ export function BillingPage() {
 
           <button
             onClick={() => setPaymentMode('DUE')}
-            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${
-              paymentMode === 'DUE'
+            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${paymentMode === 'DUE'
                 ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
+              }`}
           >
             <Clock className="w-4 h-4 text-slate-700" />
             <span className="text-xs">Credit/Due</span>
@@ -462,9 +458,8 @@ export function BillingPage() {
                 <div>
                   <p className="text-xs text-slate-500 font-medium">Change to Return</p>
                   <p
-                    className={`text-lg font-bold ${
-                      cashTendered < grandTotal ? 'text-rose-600' : 'text-slate-900'
-                    }`}
+                    className={`text-lg font-bold ${cashTendered < grandTotal ? 'text-rose-600' : 'text-slate-900'
+                      }`}
                   >
                     {formatPaiseToRupees(changeReturned)}
                   </p>
