@@ -51,12 +51,14 @@ export function PinLoginPage() {
       setIsLoading(true);
       setError('');
 
+      const headers = { 'Content-Type': 'application/json' };
+      if (user?.outletId && user.outletId !== 'default-outlet') {
+        headers['x-outlet-id'] = user.outletId;
+      }
+
       const res = await fetch('/v1/auth/pin-login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-outlet-id': 'default-outlet',
-        },
+        headers,
         body: JSON.stringify({
           deviceId: 'device-pos-counter-1',
           pin: activePin,

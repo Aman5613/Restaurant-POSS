@@ -1,5 +1,4 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -16,7 +15,9 @@ import {
   Store,
   ShieldAlert,
   X,
+  LogOut,
 } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import { cn } from '@/lib/utils';
@@ -74,11 +75,18 @@ const ROLE_LABELS = {
 };
 
 export function Sidebar() {
-  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const { user, clearAuth } = useAuthStore();
   const { isMobileSidebarOpen, closeMobileSidebar } = useUiStore();
   const isTopNavRole = user?.role === 'biller' || user?.role === 'captain' || user?.role === 'cook';
   const visibleNav = (user?.role && ROLE_NAVIGATION[user.role]) || ROLE_NAVIGATION.biller;
   const roleLabel = (user?.role && ROLE_LABELS[user.role]) || user?.role || 'Staff';
+
+  const handleLogout = () => {
+    closeMobileSidebar();
+    clearAuth();
+    navigate('/login');
+  };
 
   return (
     <>
@@ -144,10 +152,32 @@ export function Sidebar() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-slate-200 text-[11px] font-medium text-slate-500 flex justify-between items-center bg-slate-50/60">
+        {/* User Card & Logout Button */}
+        <div className="p-3 border-t border-slate-200 bg-slate-50/80 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 pr-2">
+              <p className="text-xs font-bold text-slate-900 truncate">{user?.name || 'Staff'}</p>
+              <p className="text-[10px] text-slate-500 truncate capitalize">{user?.email || user?.phone || 'Logged in'}</p>
+            </div>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 uppercase tracking-wider shrink-0">
+              {roleLabel}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Logout Account</span>
+          </button>
+        </div>
+
+        <div className="p-2.5 border-t border-slate-200 text-[10px] font-medium text-slate-500 flex justify-between items-center bg-slate-100/50">
           <span>v1.0.0-mvp</span>
           <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Online
           </span>
         </div>

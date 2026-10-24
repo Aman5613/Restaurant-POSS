@@ -377,12 +377,12 @@ export function Header() {
           <Button
             variant="ghost"
             size="sm"
-            className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 text-xs font-semibold h-8 px-2.5 gap-1"
+            className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 text-xs font-bold h-8 px-2 sm:px-2.5 gap-1 shrink-0"
             onClick={handleLogout}
             title="Log out and return to login screen"
           >
-            <LogOut className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Logout</span>
+            <LogOut className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-[11px] font-bold">Logout</span>
           </Button>
         </div>
       </div>

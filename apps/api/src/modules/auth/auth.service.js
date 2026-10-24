@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import argon2 from 'argon2';
 import { User, Session, OverrideLog, AuditLog, Outlet } from '../../models/index.js';
 import { ROLE_DEFINITIONS, AUDIT_EVENTS } from '@pos/shared';
@@ -61,7 +62,9 @@ export class AuthService {
   async loginWithPin({ deviceId, pin, outletId, ipAddress, userAgent }) {
     // Find active user in that outlet or any outlet matching PIN
     const query = { isActive: true };
-    if (outletId) query.outletId = outletId;
+    if (outletId && mongoose.Types.ObjectId.isValid(outletId)) {
+      query.outletId = outletId;
+    }
 
     const candidates = await User.find(query);
     let matchedUser = null;

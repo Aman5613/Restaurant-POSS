@@ -157,6 +157,11 @@ export function UsersPage() {
       return;
     }
 
+    if (editingUser.password && editingUser.password.trim().length < 6) {
+      setFormError('Password must be at least 6 characters.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const payload = {
@@ -171,6 +176,9 @@ export function UsersPage() {
       }
       if (editingUser.pin?.trim()) {
         payload.pin = editingUser.pin.trim();
+      }
+      if (editingUser.password?.trim()) {
+        payload.password = editingUser.password.trim();
       }
 
       const userId = editingUser._id || editingUser.id;
@@ -754,6 +762,21 @@ export function UsersPage() {
                     value={editingUser.pin || ''}
                     onChange={(e) =>
                       setEditingUser({ ...editingUser, pin: e.target.value.replace(/\D/g, '') })
+                    }
+                    className="text-xs h-9 mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700">
+                    Reset Password (Leave blank to keep unchanged)
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="Enter new password (min. 6 characters)"
+                    value={editingUser.password || ''}
+                    onChange={(e) =>
+                      setEditingUser({ ...editingUser, password: e.target.value })
                     }
                     className="text-xs h-9 mt-1"
                   />

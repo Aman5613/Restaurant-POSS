@@ -82,27 +82,6 @@ export function LoginPage() {
             </CardDescription>
           </CardHeader>
 
-          {/* Super Admin Quick Login Card */}
-          <div className="px-6 pb-2">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-xl shrink-0">👑</span>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 truncate">Platform Super Admin</p>
-                  <p className="text-[10px] text-slate-500 font-mono truncate">superadmin@pos.internal</p>
-                </div>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 px-3 font-semibold shrink-0 shadow-xs"
-                onClick={() => handleQuickRole('super-admin')}
-              >
-                1-Click Super Admin
-              </Button>
-            </div>
-          </div>
-
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-3.5 pt-2">
               {error && (
