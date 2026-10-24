@@ -1,16 +1,16 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, getRoleHome } from '@/stores/auth-store';
 
-export function RoleGuard({ allowedRoles, fallbackPath = '/unauthorized' }) {
-  const { isAuthenticated, hasRole } = useAuthStore();
+export function RoleGuard({ allowedRoles, fallbackPath }) {
+  const { isAuthenticated, user, hasRole } = useAuthStore();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && !hasRole(allowedRoles)) {
-    return <Navigate to={fallbackPath} replace />;
+    return <Navigate to={fallbackPath || getRoleHome(user?.role)} replace />;
   }
 
   return <Outlet />;

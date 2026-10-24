@@ -24,6 +24,7 @@ const itemSchema = new mongoose.Schema(
     stationId: { type: mongoose.Schema.Types.ObjectId, ref: 'KitchenStation' },
     isVeg: { type: Boolean, default: true },
     isAvailable: { type: Boolean, default: true, index: true },
+    imageUrl: { type: String, trim: true },
     sortOrder: { type: Number, default: 0 },
     variants: [itemVariantSchema],
     addons: [itemAddonSchema],

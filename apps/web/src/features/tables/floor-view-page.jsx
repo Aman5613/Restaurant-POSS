@@ -12,11 +12,13 @@ import {
   Plus,
   UtensilsCrossed,
   RotateCcw,
+  Banknote,
 } from 'lucide-react';
 import { formatPaiseToRupees, TABLE_STATUS } from '@pos/shared';
 import { usePosStore } from '@/stores/pos-store';
 import { apiClient } from '@/lib/api-client';
 import { useSocket } from '@/hooks/use-socket';
+import { stopReadyRinger } from '@/lib/sound-effects';
 
 export function FloorViewPage() {
   const navigate = useNavigate();
@@ -123,6 +125,7 @@ export function FloorViewPage() {
   };
 
   const handleTableClick = (table) => {
+    stopReadyRinger();
     if (table.status === TABLE_STATUS.BILLED) {
       navigate(`/billing?tableId=${table.id}&tableName=${encodeURIComponent(table.name)}`);
     } else {
@@ -334,7 +337,17 @@ export function FloorViewPage() {
                       className="flex-1 text-xs h-7 font-semibold border-slate-300 text-slate-800 hover:bg-slate-100"
                       onClick={() => handleTableClick(table)}
                     >
-                      {isBilled ? 'View Bill' : 'Manage'}
+                      {isBilled ? 'Settle Bill' : 'Order'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-7 px-2 font-semibold border-rose-200 text-rose-700 hover:bg-rose-50"
+                      title="Direct Bill & Settlement"
+                      onClick={() => navigate(`/billing?tableId=${table.id}&tableName=${encodeURIComponent(table.name)}`)}
+                    >
+                      <Banknote className="w-3.5 h-3.5 mr-0.5" />
+                      <span className="hidden xs:inline">Bill</span>
                     </Button>
                     <Button
                       size="sm"

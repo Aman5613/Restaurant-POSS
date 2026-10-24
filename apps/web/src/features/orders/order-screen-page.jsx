@@ -56,6 +56,52 @@ export function OrderScreenPage() {
   const [search, setSearch] = useState('');
   const [guestCount, setGuestCount] = useState(currentTable?.guestCount || 2);
   const [orderLines, setOrderLines] = useState([]);
+  const [hasCookStaff, setHasCookStaff] = useState(true);
+  const [cgstRate, setCgstRate] = useState(2.5);
+  const [sgstRate, setSgstRate] = useState(2.5);
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient
+      .get('/v1/users?role=cook')
+      .then((res) => {
+        if (!isMounted) return;
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.data?.data)
+          ? res.data.data
+          : Array.isArray(res?.data?.users)
+          ? res.data.users
+          : [];
+        setHasCookStaff(list.length > 0);
+      })
+      .catch(() => {});
+
+    apiClient
+      .get('/v1/outlet/tax-groups')
+      .then((res) => {
+        if (!isMounted) return;
+        const groups = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.taxGroups)
+          ? res.taxGroups
+          : Array.isArray(res?.data?.taxGroups)
+          ? res.data.taxGroups
+          : [];
+        const activeGroup = groups.find((g) => g.isActive !== false) || groups[0];
+        if (activeGroup) {
+          const c = activeGroup.cgstRate ?? activeGroup.cgst ?? (activeGroup.rate ? activeGroup.rate / 2 : 2.5);
+          const s = activeGroup.sgstRate ?? activeGroup.sgst ?? (activeGroup.rate ? activeGroup.rate / 2 : 2.5);
+          setCgstRate(Number(c));
+          setSgstRate(Number(s));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [deliveryCustomer, setDeliveryCustomer] = useState({
     name: '',
@@ -91,6 +137,7 @@ export function OrderScreenPage() {
               categoryId: typeof it.categoryId === 'object' ? it.categoryId?._id : it.categoryId,
               categoryName: typeof it.categoryId === 'object' ? it.categoryId?.name : '',
               basePrice: it.basePrice || 0,
+              imageUrl: it.imageUrl || it.image || '',
               isVeg: it.isVeg !== false,
               isAvailable: it.isAvailable !== false,
               stationId: typeof it.stationId === 'object' ? it.stationId?._id : it.stationId,
@@ -407,6 +454,12 @@ export function OrderScreenPage() {
   };
 
   const handleSendToKitchen = () => {
+    if (!hasCookStaff) {
+      setNotification('Cannot send KOT: No Kitchen Cook/KDS account exists for your store. Please create a Cook staff in Admin -> Staff first.');
+      setTimeout(() => setNotification(null), 4500);
+      return;
+    }
+
     const draftCount = orderLines.filter((l) => l.status === 'DRAFT' || !l.status).length;
     if (draftCount === 0) {
       setNotification('All items have already been dispatched to KOT!');
@@ -471,8 +524,8 @@ export function OrderScreenPage() {
     return acc + (line.unitPrice + addonsTotal) * line.quantity;
   }, 0);
 
-  const cgstAmount = Math.round((subtotal * 2.5) / 100);
-  const sgstAmount = Math.round((subtotal * 2.5) / 100);
+  const cgstAmount = Math.round((subtotal * cgstRate) / 100);
+  const sgstAmount = Math.round((subtotal * sgstRate) / 100);
   const grandTotal = subtotal + cgstAmount + sgstAmount;
 
   const hasDraftItems = orderLines.some((l) => l.status === 'DRAFT');
@@ -696,6 +749,18 @@ export function OrderScreenPage() {
               </div>
 
               <div>
+                {item.imageUrl && (
+                  <div className="w-full h-20 mb-1.5 overflow-hidden rounded-lg bg-slate-100 border border-slate-100">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
                 <h4 className="font-bold text-xs text-slate-900 group-hover:text-rose-700 transition-colors line-clamp-1">
                   {item.name}
                 </h4>
@@ -883,7 +948,7 @@ export function OrderScreenPage() {
             <span>{formatPaiseToRupees(subtotal)}</span>
           </div>
           <div className="flex justify-between text-xs text-slate-500">
-            <span>CGST (2.5%) + SGST (2.5%)</span>
+            <span>CGST ({cgstRate}%) + SGST ({sgstRate}%)</span>
             <span>{formatPaiseToRupees(cgstAmount + sgstAmount)}</span>
           </div>
           <div className="flex justify-between text-sm font-bold text-slate-900 pt-1.5 border-t border-slate-100">

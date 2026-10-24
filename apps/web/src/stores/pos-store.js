@@ -101,7 +101,23 @@ function calculateOrderTotal(lines) {
   }, 0);
 }
 
-const STORAGE_KEY = 'resto_pos_state_v2';
+function getActiveOutletId() {
+  try {
+    const raw = localStorage.getItem('resto_pos_auth_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.user?.outletId) return parsed.user.outletId;
+    }
+  } catch {
+    // ignore
+  }
+  return 'default';
+}
+
+function getStorageKey(outletId) {
+  const oId = outletId || getActiveOutletId();
+  return `resto_pos_state_${oId}_v2`;
+}
 
 export const INITIAL_AREAS = [
   { id: 'area_1', name: 'Ground Floor AC', code: 'GF-AC', sortOrder: 1 },
@@ -224,9 +240,10 @@ export const INITIAL_MENU_ITEMS = [
   },
 ];
 
-function loadPersistedState() {
+function loadPersistedState(outletId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const key = getStorageKey(outletId);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.tables) {
@@ -265,30 +282,7 @@ function loadPersistedState() {
       openingFloat: 500000,
       movements: [],
     },
-    customers: [
-      {
-        id: 'cust_1',
-        name: 'Rahul Sharma',
-        phone: '9876543210',
-        email: 'rahul@example.com',
-        gstin: '27AAAAA0000A1Z5',
-        totalSpentPaise: 450000,
-        visitsCount: 3,
-        outstandingDuePaise: 0,
-        lastVisitAt: new Date(Date.now() - 86400000).toISOString(),
-      },
-      {
-        id: 'cust_2',
-        name: 'Priya Patel',
-        phone: '9822334455',
-        email: 'priya@example.com',
-        gstin: '',
-        totalSpentPaise: 128000,
-        visitsCount: 1,
-        outstandingDuePaise: 0,
-        lastVisitAt: new Date(Date.now() - 172800000).toISOString(),
-      },
-    ],
+    customers: [],
     menuItems: INITIAL_MENU_ITEMS,
     menuCategories: INITIAL_CATEGORIES,
     kotCounter: 1,
@@ -298,8 +292,9 @@ function loadPersistedState() {
 
 function saveState(state) {
   try {
+    const key = getStorageKey(state.outlet?.id || state.outlet?.outletId);
     localStorage.setItem(
-      STORAGE_KEY,
+      key,
       JSON.stringify({
         tables: state.tables,
         areas: state.areas,
@@ -948,5 +943,11 @@ export const usePosStore = create((set, get) => ({
     };
     saveState(next);
     set(next);
+  },
+
+  // Multi-outlet data isolation: switch state per outlet
+  switchOutlet: (outletId) => {
+    const loadedState = loadPersistedState(outletId);
+    set(loadedState);
   },
 }));

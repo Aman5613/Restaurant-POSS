@@ -105,7 +105,7 @@ export class SuperAdminService {
       },
       upiId: upiId || undefined,
       logoUrl: logoUrl || undefined,
-      isSetupCompleted: true,
+      isSetupCompleted: false,
     });
 
     // 3. Hash credentials
@@ -125,9 +125,10 @@ export class SuperAdminService {
       isActive: true,
     });
 
-    // 5. Seed standard slabs for the new outlet
+    // 5. Seed standard slabs, catalog, and tables for the new outlet
     try {
       await this.outletService.seedStandardSlabs(outlet._id);
+      await this.outletService.seedStandardCatalogAndTables(outlet._id);
     } catch (_err) {
       // Non-blocking
     }

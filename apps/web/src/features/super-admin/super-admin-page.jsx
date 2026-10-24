@@ -25,10 +25,10 @@ import { apiClient } from '@/lib/api-client';
 
 export function SuperAdminPage() {
   const [stats, setStats] = useState({
-    totalTenants: 1,
-    totalOutlets: 1,
-    totalOwners: 1,
-    activeOwners: 1,
+    totalTenants: 0,
+    totalOutlets: 0,
+    totalOwners: 0,
+    activeOwners: 0,
   });
   const [owners, setOwners] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,25 +85,7 @@ export function SuperAdminPage() {
       if (rawOwners && rawOwners.length > 0) {
         setOwners(rawOwners);
       } else {
-        // Fallback demo owner if empty
-        setOwners([
-          {
-            _id: 'own_demo',
-            name: 'Aman Sharma',
-            phone: '9888888888',
-            email: 'admin@spicegarden.com',
-            role: 'admin',
-            isActive: true,
-            tenant: { name: 'Spice Garden Group' },
-            outlet: {
-              name: 'Spice Garden - Main Outlet',
-              code: 'OUT-01',
-              phone: '9876543210',
-              upiId: 'spicegarden@okaxis',
-              address: { city: 'Mumbai', state: 'Maharashtra' },
-            },
-          },
-        ]);
+        setOwners([]);
       }
     } catch (_err) {
       notify('Unable to load super-admin data', 'warning');

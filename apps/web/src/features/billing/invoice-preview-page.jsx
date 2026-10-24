@@ -11,10 +11,31 @@ import { apiClient } from '@/lib/api-client';
 export function InvoicePreviewPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const invoiceNo = searchParams.get('no') || searchParams.get('invoiceNo') || 'INV-2026-0042';
+  const rawInvoiceNo = searchParams.get('no') || searchParams.get('invoiceNo');
 
-  const { getInvoice, outlet: storeOutlet, setOutlet } = usePosStore();
-  const stored = getInvoice(invoiceNo);
+  const { getInvoice, outlet: storeOutlet, setOutlet, invoices } = usePosStore();
+
+  // 1. Try to find invoice by requested invoice number
+  let stored = rawInvoiceNo ? getInvoice(rawInvoiceNo) : null;
+
+  // 2. Try localStorage fallback (most recently settled invoice in this browser session)
+  if (!stored) {
+    try {
+      const rawLocal = localStorage.getItem('pos_last_settled_invoice');
+      if (rawLocal) {
+        const parsed = JSON.parse(rawLocal);
+        if (!rawInvoiceNo || parsed.invoiceNo === rawInvoiceNo) {
+          stored = parsed;
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Try most recent invoice in posStore
+  if (!stored && invoices && Object.keys(invoices).length > 0) {
+    const keys = Object.keys(invoices);
+    stored = invoices[keys[keys.length - 1]];
+  }
 
   const [liveOutlet, setLiveOutlet] = useState(storeOutlet || null);
 
@@ -43,7 +64,7 @@ export function InvoicePreviewPage() {
   const formatAddress = (addr) => {
     if (!addr) return '';
     if (typeof addr === 'string') return addr;
-    return [addr.line1, addr.line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ');
+    return [addr.line1 || addr.street, addr.line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ');
   };
 
   const formattedAddress = formatAddress(stored?.address || activeOutlet.address);
@@ -54,31 +75,55 @@ export function InvoicePreviewPage() {
   const upiId = stored?.upiId || activeOutlet.upiId || '';
 
   const invoiceData = stored || {
-    invoiceNo,
+    invoiceNo: rawInvoiceNo || 'INV-2026-0042',
     outletName,
     legalName,
     gstin,
     fssai,
     address: formattedAddress,
     phone,
-    tableName: 'Table 1',
+    email,
+    tableName: 'Counter',
+    orderType: 'DINE_IN',
+    guestCount: 2,
     cashierName: 'Counter Cashier',
     date: new Date().toLocaleDateString('en-IN'),
     time: new Date().toLocaleTimeString('en-IN'),
     lines: [
-      { name: 'Paneer Tikka (Full)', qty: 1, price: 28000, total: 28000 },
-      { name: 'Butter Chicken (Full)', qty: 1, price: 39000, total: 39000 },
-      { name: 'Butter Naan', qty: 4, price: 6500, total: 26000 },
-      { name: 'Masala Chaas', qty: 2, price: 7000, total: 14000 },
+      {
+        name: 'Paneer Tikka Angara',
+        variantName: 'Full (8 pcs)',
+        qty: 1,
+        unitPrice: 28000,
+        price: 28000,
+        addons: [{ name: 'Extra Mint Chutney', price: 2000 }],
+        addonsTotal: 2000,
+        total: 30000,
+      },
+      {
+        name: 'Butter Naan',
+        variantName: null,
+        qty: 2,
+        unitPrice: 6500,
+        price: 6500,
+        addons: [{ name: 'Garlic Butter Topping', price: 1500 }],
+        addonsTotal: 3000,
+        total: 16000,
+      },
     ],
-    subtotal: 107000,
-    discount: 10700,
-    taxable: 96300,
-    cgst: 2408,
-    sgst: 2408,
-    roundOff: -16,
-    grandTotal: 101100,
+    subtotal: 46000,
+    discount: 0,
+    taxable: 46000,
+    cgstRate: 2.5,
+    sgstRate: 2.5,
+    cgst: 1150,
+    sgst: 1150,
+    chargesBreakdown: [],
+    roundOff: 0,
+    grandTotal: 48300,
     paymentMode: 'CASH',
+    cashTendered: 50000,
+    changeReturned: 1700,
   };
 
   const [upiQrUrl, setUpiQrUrl] = useState('');
@@ -204,7 +249,7 @@ export function InvoicePreviewPage() {
             )}
           </div>
 
-          <div className="border-t border-b border-dashed border-slate-400 py-1 text-center font-bold">
+          <div className="border-t border-b border-dashed border-slate-400 py-1 text-center font-bold tracking-wider">
             TAX INVOICE
           </div>
 
@@ -214,29 +259,95 @@ export function InvoicePreviewPage() {
               <span>{invoiceData.date}</span>
             </div>
             <div className="flex justify-between">
-              <span>TABLE: {invoiceData.tableName}</span>
+              <span>
+                TABLE: {invoiceData.tableName || 'Counter'}
+                {invoiceData.orderType && ` (${invoiceData.orderType.replace('_', ' ')})`}
+              </span>
               <span>{invoiceData.time}</span>
             </div>
-            <div>CASHIER: {invoiceData.cashierName || 'Counter Cashier'}</div>
+            {invoiceData.guestCount && (
+              <div className="flex justify-between text-[10px] text-slate-600">
+                <span>GUESTS: {invoiceData.guestCount}</span>
+                <span>CASHIER: {invoiceData.cashierName || 'Counter Cashier'}</span>
+              </div>
+            )}
+            {!invoiceData.guestCount && (
+              <div>CASHIER: {invoiceData.cashierName || 'Counter Cashier'}</div>
+            )}
+            {(invoiceData.customerName || invoiceData.customerPhone) && (
+              <div className="text-[10px] text-slate-700 pt-0.5">
+                <span>CUSTOMER: {invoiceData.customerName || 'Walk-in'}</span>
+                {invoiceData.customerPhone && <span> • {invoiceData.customerPhone}</span>}
+              </div>
+            )}
+            {invoiceData.deliveryAddress && (
+              <div className="text-[9px] text-slate-600 leading-tight">
+                DELIVERY ADDR: {invoiceData.deliveryAddress}
+              </div>
+            )}
           </div>
 
           {/* Items Table */}
           <div className="border-t border-b border-dashed border-slate-400 py-1.5 space-y-1">
             <div className="flex justify-between font-bold text-[10px] uppercase text-slate-700">
-              <span className="w-8">Qty</span>
-              <span className="flex-1 text-left">Item</span>
-              <span className="w-12 text-right">Rate</span>
-              <span className="w-16 text-right">Amount</span>
+              <span className="w-8 shrink-0">Qty</span>
+              <span className="flex-1 text-left px-1">Item</span>
+              <span className="w-14 text-right shrink-0">Rate</span>
+              <span className="w-16 text-right shrink-0">Amount</span>
             </div>
             <div className="border-t border-dotted border-slate-300" />
-            {invoiceData.lines.map((l, i) => (
-              <div key={i} className="flex justify-between text-[11px]">
-                <span className="w-8">{l.qty}x</span>
-                <span className="flex-1 text-left truncate pr-1">{l.name}</span>
-                <span className="w-12 text-right">{formatPaiseToRupees(l.price)}</span>
-                <span className="w-16 text-right font-semibold">{formatPaiseToRupees(l.total)}</span>
-              </div>
-            ))}
+            {(invoiceData.lines || []).map((l, i) => {
+              const addonsList = Array.isArray(l.addons) ? l.addons : [];
+              const unitPrice = l.unitPrice || l.price || 0;
+              const lineTotal =
+                l.total ||
+                (unitPrice + addonsList.reduce((acc, a) => acc + (a.price || 0), 0)) * (l.qty || 1);
+
+              return (
+                <div key={i} className="py-1 border-b border-dotted border-slate-200 last:border-b-0 space-y-0.5">
+                  <div className="flex justify-between items-start text-[11px] leading-tight">
+                    <span className="w-8 font-semibold shrink-0">{l.qty}x</span>
+                    <div className="flex-1 text-left px-1 break-words">
+                      <span className="font-semibold text-slate-900">{l.name}</span>
+                      {l.variantName && (
+                        <span className="text-[10px] text-slate-600 font-normal ml-1">
+                          ({l.variantName})
+                        </span>
+                      )}
+                    </div>
+                    <span className="w-14 text-right text-slate-600 shrink-0">
+                      {formatPaiseToRupees(unitPrice)}
+                    </span>
+                    <span className="w-16 text-right font-bold text-slate-900 shrink-0">
+                      {formatPaiseToRupees(lineTotal)}
+                    </span>
+                  </div>
+
+                  {/* Complete Add-ons Breakdown */}
+                  {addonsList.length > 0 && (
+                    <div className="pl-8 pr-1 space-y-0.5 text-[10px] text-slate-600">
+                      {addonsList.map((addon, aIdx) => (
+                        <div key={aIdx} className="flex justify-between items-center italic">
+                          <span className="break-words">+ {addon.name}</span>
+                          {addon.price > 0 && (
+                            <span className="text-slate-500 font-normal">
+                              +{formatPaiseToRupees(addon.price)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Special Notes / Instructions */}
+                  {l.notes && (
+                    <div className="pl-8 text-[9px] text-amber-700 italic">
+                      Note: {l.notes}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Breakdown */}
@@ -247,7 +358,9 @@ export function InvoicePreviewPage() {
             </div>
             {invoiceData.discount > 0 && (
               <div className="flex justify-between text-slate-700 font-semibold">
-                <span>Discount Applied</span>
+                <span>
+                  Discount {invoiceData.discountReason ? `(${invoiceData.discountReason})` : 'Applied'}
+                </span>
                 <span>-{formatPaiseToRupees(invoiceData.discount)}</span>
               </div>
             )}
@@ -255,12 +368,19 @@ export function InvoicePreviewPage() {
               <span>Taxable Subtotal</span>
               <span>{formatPaiseToRupees(invoiceData.taxable)}</span>
             </div>
+            {Array.isArray(invoiceData.chargesBreakdown || invoiceData.charges) &&
+              (invoiceData.chargesBreakdown || invoiceData.charges).map((chg, idx) => (
+                <div key={idx} className="flex justify-between text-slate-700">
+                  <span>{chg.name} {chg.isPercentage ? `(${chg.rate}%)` : ''}</span>
+                  <span>{formatPaiseToRupees(chg.amount)}</span>
+                </div>
+              ))}
             <div className="flex justify-between">
-              <span>CGST @ 2.5%</span>
+              <span>CGST @ {invoiceData.cgstRate ?? 2.5}%</span>
               <span>{formatPaiseToRupees(invoiceData.cgst)}</span>
             </div>
             <div className="flex justify-between">
-              <span>SGST @ 2.5%</span>
+              <span>SGST @ {invoiceData.sgstRate ?? 2.5}%</span>
               <span>{formatPaiseToRupees(invoiceData.sgst)}</span>
             </div>
             {invoiceData.roundOff !== 0 && (
@@ -276,15 +396,35 @@ export function InvoicePreviewPage() {
           </div>
 
           {/* Payment Info */}
-          <div className="border-t border-dashed border-slate-400 pt-1 text-[11px]">
+          <div className="border-t border-dashed border-slate-400 pt-1 text-[11px] space-y-0.5">
             <div className="flex justify-between">
               <span>Mode of Settlement</span>
               <span className="font-bold">{invoiceData.paymentMode}</span>
             </div>
+            {invoiceData.paymentMode === 'CASH' && invoiceData.cashTendered && (
+              <div className="flex justify-between text-[10px] text-slate-600">
+                <span>Cash Tendered</span>
+                <span>{formatPaiseToRupees(invoiceData.cashTendered)}</span>
+              </div>
+            )}
+            {invoiceData.paymentMode === 'CASH' && invoiceData.changeReturned > 0 && (
+              <div className="flex justify-between text-[10px] text-emerald-700 font-bold">
+                <span>Change Returned</span>
+                <span>{formatPaiseToRupees(invoiceData.changeReturned)}</span>
+              </div>
+            )}
+            {invoiceData.cardRef && (
+              <div className="flex justify-between text-[10px] text-slate-600">
+                <span>Card Ref / RRN</span>
+                <span className="font-mono">{invoiceData.cardRef}</span>
+              </div>
+            )}
             {invoiceData.customerName && (
               <div className="flex justify-between text-[10px] text-slate-600">
                 <span>Customer</span>
-                <span>{invoiceData.customerName}</span>
+                <span>
+                  {invoiceData.customerName} {invoiceData.customerPhone ? `(${invoiceData.customerPhone})` : ''}
+                </span>
               </div>
             )}
           </div>

@@ -23,7 +23,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useAuthStore, ROLE_PROFILES } from '@/stores/auth-store';
+import { useAuthStore, ROLE_PROFILES, getRoleHome } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +49,11 @@ const TOP_NAV_ITEMS = {
   captain: [
     { name: 'Floor View', href: '/tables', icon: Grid3X3 },
     { name: 'Order Screen', href: '/orders', icon: UtensilsCrossed },
+    { name: 'Billing & Cashier', href: '/billing', icon: Banknote },
+    { name: 'All Orders', href: '/orders/list', icon: Receipt },
     { name: 'KOT Status', href: '/kot', icon: Receipt },
+    { name: 'Day Operations', href: '/day-ops', icon: CalendarDays },
+    { name: 'Customer Ledger', href: '/customers', icon: Contact },
   ],
 };
 
@@ -82,12 +86,12 @@ export function Header() {
   const navigation = [
     { name: 'Tables', href: '/tables', icon: Grid3X3, roles: ['admin', 'manager', 'biller', 'captain'] },
     { name: 'Orders', href: '/orders', icon: UtensilsCrossed, roles: ['admin', 'manager', 'biller', 'captain'] },
-    { name: 'All Bills', href: '/orders/list', icon: Receipt, roles: ['admin', 'manager', 'biller'] },
+    { name: 'All Bills', href: '/orders/list', icon: Receipt, roles: ['admin', 'manager', 'biller', 'captain'] },
     { name: 'Kitchen KDS', href: '/kitchen', icon: ChefHat, roles: ['admin', 'manager', 'biller', 'captain', 'cook'] },
     { name: 'KOT Queue', href: '/kot', icon: Receipt, roles: ['admin', 'manager', 'biller', 'captain', 'cook'] },
-    { name: 'Billing', href: '/billing', icon: Banknote, roles: ['admin', 'manager', 'biller'] },
-    { name: 'Day Ops', href: '/day-ops', icon: CalendarDays, roles: ['admin', 'manager', 'biller'] },
-    { name: 'Customers', href: '/customers', icon: Contact, roles: ['admin', 'manager', 'biller'] },
+    { name: 'Billing', href: '/billing', icon: Banknote, roles: ['admin', 'manager', 'biller', 'captain'] },
+    { name: 'Day Ops', href: '/day-ops', icon: CalendarDays, roles: ['admin', 'manager', 'biller', 'captain'] },
+    { name: 'Customers', href: '/customers', icon: Contact, roles: ['admin', 'manager', 'biller', 'captain'] },
     { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin', 'manager'] },
     { name: 'Manager', href: '/manager', icon: ShieldCheck, roles: ['admin', 'manager'] },
     { name: 'Owner Hub', href: '/admin', icon: Store, roles: ['admin'] },
@@ -136,17 +140,7 @@ export function Header() {
   const handleSwitchRole = (roleKey) => {
     quickLoginRole(roleKey);
     setShowRoleMenu(false);
-    if (roleKey === 'super-admin') {
-      navigate('/super-admin');
-    } else if (roleKey === 'admin') {
-      navigate('/admin');
-    } else if (roleKey === 'manager') {
-      navigate('/manager');
-    } else if (roleKey === 'cook') {
-      navigate('/kitchen');
-    } else {
-      navigate('/tables');
-    }
+    navigate(getRoleHome(roleKey));
   };
 
   return (

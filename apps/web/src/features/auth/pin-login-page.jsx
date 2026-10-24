@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuthStore, ROLE_PROFILES } from '@/stores/auth-store';
+import { useAuthStore, ROLE_PROFILES, getRoleHome } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { KeyRound, Delete, UserCheck, ArrowLeft, Zap } from 'lucide-react';
 
 export function PinLoginPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, setAuth, quickLoginRole } = useAuthStore();
+  const { isAuthenticated, user, setAuth, quickLoginRole } = useAuthStore();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/tables', { replace: true });
+      navigate(getRoleHome(user?.role), { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user?.role, navigate]);
 
   const handleKeyPress = (num) => {
     if (pin.length < 6) {
@@ -43,7 +43,7 @@ export function PinLoginPage() {
 
     if (matchedRole) {
       quickLoginRole(matchedRole);
-      navigate('/tables');
+      navigate(getRoleHome(matchedRole), { replace: true });
       return;
     }
 
@@ -69,7 +69,7 @@ export function PinLoginPage() {
       }
 
       setAuth({ user: data.user, accessToken: data.accessToken });
-      navigate('/tables');
+      navigate(getRoleHome(data.user?.role, data.user?.isSetupCompleted), { replace: true });
     } catch (err) {
       setError(err.message || 'PIN verification failed');
       setPin('');
@@ -80,7 +80,7 @@ export function PinLoginPage() {
 
   const handleQuickRole = (roleKey) => {
     quickLoginRole(roleKey);
-    navigate('/tables');
+    navigate(getRoleHome(roleKey), { replace: true });
   };
 
   return (
@@ -93,33 +93,24 @@ export function PinLoginPage() {
             </div>
             <CardTitle className="text-xl font-bold text-slate-900">Counter PIN Login</CardTitle>
             <CardDescription className="text-xs text-slate-500">
-              Enter staff 4-digit PIN or tap a quick role
+              Enter your assigned staff PIN on the keypad
             </CardDescription>
           </CardHeader>
 
-          {/* Quick Role Badges */}
+          {/* Super Admin PIN Shortcut */}
           <div className="px-5 pb-1">
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 bg-slate-50 border border-slate-200 p-1.5 rounded-xl text-center">
-              {[
-                { key: 'biller', label: 'Biller', pin: '3333' },
-                { key: 'captain', label: 'Captain', pin: '4444' },
-                { key: 'cook', label: 'Cook', pin: '5555' },
-                { key: 'manager', label: 'Manager', pin: '2222' },
-                { key: 'admin', label: 'Admin', pin: '1111' },
-                { key: 'super-admin', label: 'Super', pin: '9999' },
-              ].map((r) => (
-                <button
-                  key={r.key}
-                  type="button"
-                  onClick={() => handleQuickRole(r.key)}
-                  className="p-1 rounded-lg border border-slate-200 hover:border-rose-400 bg-white hover:bg-rose-50/70 transition-all text-center"
-                  title={`Quick login as ${r.label} (PIN: ${r.pin})`}
-                >
-                  <p className="text-[10px] font-bold text-slate-800 leading-tight">{r.label}</p>
-                  <p className="text-[9px] font-mono text-slate-400">{r.pin}</p>
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => handlePinSubmit('9999')}
+              className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 hover:bg-slate-100 transition-all text-xs font-semibold text-slate-800 shadow-2xs"
+            >
+              <span className="flex items-center gap-1.5">
+                <span>👑</span> Super Admin (PIN: 9999)
+              </span>
+              <span className="text-[10px] font-mono text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                Tap to Fill
+              </span>
+            </button>
           </div>
 
           <CardContent className="space-y-3 pt-2">

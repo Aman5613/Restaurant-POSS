@@ -45,6 +45,7 @@ export const itemSchema = z.object({
   stationId: z.string().optional(),
   isVeg: z.boolean().default(true),
   isAvailable: z.boolean().default(true),
+  imageUrl: z.string().optional().nullable(),
   sortOrder: z.number().int().default(0),
   variants: z.array(itemVariantSchema).default([]),
   addons: z.array(addonOptionSchema).default([]),

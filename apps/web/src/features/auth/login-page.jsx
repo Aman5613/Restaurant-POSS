@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuthStore, ROLE_PROFILES } from '@/stores/auth-store';
+import { useAuthStore, ROLE_PROFILES, getRoleHome } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Lock, Smartphone, ShieldCheck, Zap, Info } from 'lucide-react';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, setAuth, quickLoginRole } = useAuthStore();
+  const { isAuthenticated, user, setAuth, quickLoginRole } = useAuthStore();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,9 +16,9 @@ export function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/tables', { replace: true });
+      navigate(getRoleHome(user?.role), { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user?.role, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -43,7 +43,7 @@ export function LoginPage() {
       }
 
       setAuth({ user: data.user, accessToken: data.accessToken });
-      navigate('/tables');
+      navigate(getRoleHome(data.user?.role, data.user?.isSetupCompleted), { replace: true });
     } catch (err) {
       // Fallback check against seeded profiles if API is offline or returns error
       const trimmed = identifier.trim().toLowerCase();
@@ -53,7 +53,7 @@ export function LoginPage() {
 
       if (matchedProfile && (password === 'Pos@12345' || password.length >= 4)) {
         quickLoginRole(matchedProfile.role);
-        navigate('/tables');
+        navigate(getRoleHome(matchedProfile.role), { replace: true });
         return;
       }
 
@@ -65,7 +65,7 @@ export function LoginPage() {
 
   const handleQuickRole = (roleKey) => {
     quickLoginRole(roleKey);
-    navigate('/tables');
+    navigate(getRoleHome(roleKey), { replace: true });
   };
 
   return (
@@ -78,39 +78,28 @@ export function LoginPage() {
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">RestoPOS Login</CardTitle>
             <CardDescription className="text-xs text-slate-500">
-              Sign in with credentials or select a quick role login below
+              Enter your credentials to access your restaurant dashboard
             </CardDescription>
           </CardHeader>
 
-          {/* 1-Click Quick Role Login Bar */}
+          {/* Super Admin Quick Login Card */}
           <div className="px-6 pb-2">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                <Zap className="w-4 h-4 text-rose-600 fill-rose-600" />
-                <span>1-Click Quick Login as Role:</span>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-xl shrink-0">👑</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">Platform Super Admin</p>
+                  <p className="text-[10px] text-slate-500 font-mono truncate">superadmin@pos.internal</p>
+                </div>
               </div>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                {[
-                  { key: 'biller', label: 'Biller', icon: '💵' },
-                  { key: 'captain', label: 'Captain', icon: '🍽️' },
-                  { key: 'cook', label: 'Cook', icon: '👨‍🍳' },
-                  { key: 'manager', label: 'Manager', icon: '👔' },
-                  { key: 'admin', label: 'Admin', icon: '🏢' },
-                  { key: 'super-admin', label: 'Super', icon: '👑' },
-                ].map((r) => (
-                  <button
-                    key={r.key}
-                    type="button"
-                    onClick={() => handleQuickRole(r.key)}
-                    className="p-1.5 rounded-lg border border-slate-200 hover:border-rose-400 bg-white hover:bg-rose-50/70 text-center flex flex-col items-center justify-center transition-all group"
-                  >
-                    <span className="text-base group-hover:scale-110 transition-transform">{r.icon}</span>
-                    <span className="text-[10px] font-bold text-slate-700 group-hover:text-rose-700 leading-tight">
-                      {r.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 px-3 font-semibold shrink-0 shadow-xs"
+                onClick={() => handleQuickRole('super-admin')}
+              >
+                1-Click Super Admin
+              </Button>
             </div>
           </div>
 
@@ -128,7 +117,7 @@ export function LoginPage() {
                 </label>
                 <Input
                   type="text"
-                  placeholder="e.g. biller@spicegarden.com or 9666666666"
+                  placeholder="e.g. superadmin@pos.internal or 9999999999"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   disabled={isLoading}

@@ -27,26 +27,14 @@ import { AuditLogPage } from './features/audit/audit-log-page';
 import { SuperAdminPage } from './features/super-admin/super-admin-page';
 import { AdminDashboardPage } from './features/admin/admin-dashboard-page';
 import { ROLES } from '@pos/shared';
-import { useAuthStore } from './stores/auth-store';
+import { useAuthStore, getRoleHome } from './stores/auth-store';
 
 const queryClient = new QueryClient();
 
 // Overview Dashboard - routes to dedicated role dashboard
 function Dashboard() {
   const { user } = useAuthStore();
-  if (user?.role === ROLES.SUPER_ADMIN || user?.role === 'super-admin') {
-    return <Navigate to="/super-admin" replace />;
-  }
-  if (user?.role === ROLES.ADMIN || user?.role === 'admin') {
-    return <Navigate to="/admin" replace />;
-  }
-  if (user?.role === ROLES.MANAGER || user?.role === 'manager') {
-    return <Navigate to="/manager" replace />;
-  }
-  if (user?.role === ROLES.COOK || user?.role === 'cook') {
-    return <Navigate to="/kitchen" replace />;
-  }
-  return <FloorViewPage />;
+  return <Navigate to={getRoleHome(user?.role, user?.isSetupCompleted)} replace />;
 }
 
 export function App() {
@@ -62,36 +50,40 @@ export function App() {
           {/* Main App Layout */}
           <Route path="/" element={<AppLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="tables" element={<FloorViewPage />} />
-            <Route path="orders" element={<OrderScreenPage />} />
-            <Route path="orders/new" element={<OrderScreenPage />} />
-            <Route path="orders/list" element={<OrderListPage />} />
+
+            {/* Service & Dining Routes (Captain, Biller, Manager, Admin) */}
+            <Route element={<RoleGuard allowedRoles={[ROLES.CAPTAIN, ROLES.BILLER, ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN]} />}>
+              <Route path="tables" element={<FloorViewPage />} />
+              <Route path="orders" element={<OrderScreenPage />} />
+              <Route path="orders/new" element={<OrderScreenPage />} />
+              <Route path="orders/list" element={<OrderListPage />} />
+            </Route>
+
+            {/* Kitchen & Menu Routes (Cook, Staff, Manager, Admin) */}
             <Route path="kot" element={<PrintQueuePage />} />
             <Route path="kitchen" element={<KitchenDisplayPage />} />
             <Route path="kds" element={<KitchenDisplayPage />} />
-            <Route path="billing" element={<BillingPage />} />
-            <Route path="invoices/preview" element={<InvoicePreviewPage />} />
-            <Route path="day-ops" element={<DayManagementPage />} />
-            <Route path="customers" element={<CustomerListPage />} />
             <Route path="menu" element={<MenuPage />} />
 
-            {/* Protected Routes by Role */}
-            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.SUPER_ADMIN]} />}>
-              <Route path="audit-logs" element={<AuditLogPage />} />
+            {/* Cashier & Billing Routes (Captain, Biller, Manager, Admin) */}
+            <Route element={<RoleGuard allowedRoles={[ROLES.CAPTAIN, ROLES.BILLER, ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN]} />}>
+              <Route path="billing" element={<BillingPage />} />
+              <Route path="invoices/preview" element={<InvoicePreviewPage />} />
+              <Route path="day-ops" element={<DayManagementPage />} />
+              <Route path="customers" element={<CustomerListPage />} />
             </Route>
 
-            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
+            {/* Manager Operations & Reporting */}
+            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.SUPER_ADMIN]} />}>
               <Route path="manager" element={<ManagerPage />} />
               <Route path="reports" element={<ReportsDashboardPage />} />
               <Route path="users" element={<UsersPage />} />
-            </Route>
-
-            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN]} />}>
-              <Route path="settings" element={<OutletSettingsPage />} />
+              <Route path="audit-logs" element={<AuditLogPage />} />
             </Route>
 
             {/* Admin (Owner) Control Hub */}
-            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN]} />}>
+            <Route element={<RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.SUPER_ADMIN]} />}>
+              <Route path="settings" element={<OutletSettingsPage />} />
               <Route path="admin" element={<AdminDashboardPage />} />
             </Route>
 

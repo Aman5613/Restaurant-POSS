@@ -1,51 +1,6 @@
 import { create } from 'zustand';
 
 export const ROLE_PROFILES = {
-  biller: {
-    id: 'usr_biller',
-    name: 'Deepak Sharma (Cashier / Biller)',
-    email: 'biller@spicegarden.com',
-    phone: '9666666666',
-    role: 'biller',
-    pin: '3333',
-    permissions: ['bills:create', 'bills:read', 'orders:create', 'orders:read', 'kot:read'],
-  },
-  captain: {
-    id: 'usr_captain',
-    name: 'Sunil Kumar (Head Captain)',
-    email: 'captain@spicegarden.com',
-    phone: '9555555555',
-    role: 'captain',
-    pin: '4444',
-    permissions: ['orders:create', 'orders:read', 'tables:read', 'kot:create'],
-  },
-  cook: {
-    id: 'usr_cook',
-    name: 'Chef Vikas (Kitchen Chef / Cook)',
-    email: 'cook@spicegarden.com',
-    phone: '9444444444',
-    role: 'cook',
-    pin: '5555',
-    permissions: ['kot:read', 'kot:view', 'kot:acknowledge', 'kot:ready', 'menu:view'],
-  },
-  manager: {
-    id: 'usr_manager',
-    name: 'Rajesh Verma (General Manager)',
-    email: 'manager@spicegarden.com',
-    phone: '9777777777',
-    role: 'manager',
-    pin: '2222',
-    permissions: ['reports:read', 'bills:void', 'discounts:apply', 'day:manage', 'all'],
-  },
-  admin: {
-    id: 'usr_admin',
-    name: 'Aman (Outlet Owner / Admin)',
-    email: 'admin@spicegarden.com',
-    phone: '9888888888',
-    role: 'admin',
-    pin: '1111',
-    permissions: ['all'],
-  },
   'super-admin': {
     id: 'usr_super',
     name: 'Platform Super Admin',
@@ -56,6 +11,26 @@ export const ROLE_PROFILES = {
     permissions: ['all'],
   },
 };
+
+export function getRoleHome(role, isSetupCompleted = true) {
+  if (role === 'admin' && isSetupCompleted === false) {
+    return '/setup';
+  }
+  switch (role) {
+    case 'super-admin':
+      return '/super-admin';
+    case 'admin':
+      return '/admin';
+    case 'manager':
+      return '/manager';
+    case 'cook':
+      return '/kitchen';
+    case 'captain':
+    case 'biller':
+    default:
+      return '/tables';
+  }
+}
 
 const AUTH_STORAGE_KEY = 'resto_pos_auth_v1';
 
@@ -103,8 +78,22 @@ export const useAuthStore = create((set, get) => ({
     });
   },
 
-  quickLoginRole: (roleKey) => {
-    const profile = ROLE_PROFILES[roleKey] || ROLE_PROFILES.biller;
+  updateUser: (partial) => {
+    const current = get().user;
+    if (!current) return;
+    const updated = { ...current, ...partial };
+    persistAuth(updated, get().accessToken);
+    set({ user: updated });
+  },
+
+  quickLoginRole: (roleKey = 'super-admin') => {
+    const baseProfile = ROLE_PROFILES[roleKey] || ROLE_PROFILES['super-admin'];
+    const activeOutletId = get().user?.outletId || 'default-outlet';
+    const profile = {
+      ...baseProfile,
+      outletId: activeOutletId,
+      isSetupCompleted: get().user?.isSetupCompleted ?? true,
+    };
     const token = `token_${roleKey}_${Date.now()}`;
     persistAuth(profile, token);
     set({
@@ -126,6 +115,7 @@ export const useAuthStore = create((set, get) => ({
   hasRole: (roles) => {
     const user = get().user;
     if (!user) return false;
+    if (user.role === 'super-admin') return true;
     const allowed = Array.isArray(roles) ? roles : [roles];
     return allowed.includes(user.role);
   },

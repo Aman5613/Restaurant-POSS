@@ -1,5 +1,6 @@
 import { AuthController } from './auth.controller.js';
 import { authenticate } from '../../middleware/authenticate.js';
+import { Outlet } from '../../models/index.js';
 
 export async function authRoutes(fastify, _opts) {
   const controller = new AuthController(fastify);
@@ -19,6 +20,23 @@ export async function authRoutes(fastify, _opts) {
 
   // Current authenticated user profile
   fastify.get('/me', { preHandler: [authenticate] }, async (request, reply) => {
-    return reply.send({ code: 'OK', user: request.user });
+    let outlet = null;
+    let isSetupCompleted = true;
+    if (request.user?.outletId && request.user.outletId !== 'default-outlet') {
+      try {
+        outlet = await Outlet.findById(request.user.outletId).select('name isSetupCompleted currency').lean();
+        if (outlet) isSetupCompleted = Boolean(outlet.isSetupCompleted);
+      } catch (_e) {
+        // ignore lookup errors
+      }
+    }
+    return reply.send({
+      code: 'OK',
+      user: {
+        ...request.user,
+        outletName: outlet?.name,
+        isSetupCompleted,
+      },
+    });
   });
 }

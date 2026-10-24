@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import argon2 from 'argon2';
-import { User, Session, OverrideLog, AuditLog } from '../../models/index.js';
+import { User, Session, OverrideLog, AuditLog, Outlet } from '../../models/index.js';
 import { ROLE_DEFINITIONS, AUDIT_EVENTS } from '@pos/shared';
 
 export class AuthService {
@@ -50,8 +50,10 @@ export class AuthService {
       ipAddress,
     });
 
+    const outlet = user.outletId ? await Outlet.findById(user.outletId).select('name isSetupCompleted currency').lean() : null;
+
     return {
-      user: this._sanitizeUser(user),
+      user: this._sanitizeUser(user, outlet),
       ...tokens,
     };
   }
@@ -89,8 +91,10 @@ export class AuthService {
       ipAddress,
     });
 
+    const outlet = matchedUser.outletId ? await Outlet.findById(matchedUser.outletId).select('name isSetupCompleted currency').lean() : null;
+
     return {
-      user: this._sanitizeUser(matchedUser),
+      user: this._sanitizeUser(matchedUser, outlet),
       ...tokens,
     };
   }
@@ -243,7 +247,7 @@ export class AuthService {
     return Array.from(new Set([...basePermissions, ...custom]));
   }
 
-  _sanitizeUser(user) {
+  _sanitizeUser(user, outlet = null) {
     return {
       id: user._id.toString(),
       name: user.name,
@@ -252,6 +256,8 @@ export class AuthService {
       role: user.role,
       tenantId: user.tenantId?.toString(),
       outletId: user.outletId?.toString(),
+      outletName: outlet?.name,
+      isSetupCompleted: outlet != null ? Boolean(outlet.isSetupCompleted) : (user.role === 'super-admin' ? true : false),
       permissions: this._resolvePermissions(user),
       maxDiscountPercent: user.maxDiscountPercent,
     };

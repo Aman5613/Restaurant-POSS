@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { formatPaiseToRupees } from '@pos/shared';
 import { usePosStore } from '@/stores/pos-store';
+import { useAuthStore } from '@/stores/auth-store';
 import { apiClient } from '@/lib/api-client';
 
 export function BillingPage() {
@@ -32,16 +33,53 @@ export function BillingPage() {
 
   const { getTableOrder, settleBillAndFreeTable, tables, outlet, setOutlet } = usePosStore();
 
+  const [paymentModesList, setPaymentModesList] = useState([]);
+  const [taxGroup, setTaxGroup] = useState(null);
+  const [chargeList, setChargeList] = useState([]);
+
   useEffect(() => {
     let isMounted = true;
-    apiClient
-      .get('/v1/outlet/profile')
-      .then((res) => {
-        if (!isMounted) return;
-        const o = res?.data?.outlet || res?.data;
-        if (o) setOutlet(o);
-      })
-      .catch(() => { });
+    Promise.all([
+      apiClient.get('/v1/outlet/profile').catch(() => null),
+      apiClient.get('/v1/outlet/payment-modes').catch(() => null),
+      apiClient.get('/v1/outlet/tax-groups').catch(() => null),
+      apiClient.get('/v1/outlet/charges').catch(() => null),
+    ]).then(([profileRes, modesRes, taxesRes, chargesRes]) => {
+      if (!isMounted) return;
+      const o = profileRes?.data?.outlet || profileRes?.data;
+      if (o) setOutlet(o);
+
+      const rawModes = Array.isArray(modesRes?.data?.paymentModes)
+        ? modesRes.data.paymentModes
+        : Array.isArray(modesRes?.data)
+        ? modesRes.data
+        : [];
+      if (rawModes.length > 0) {
+        setPaymentModesList(rawModes);
+        const enabled = rawModes.filter((m) => m.isEnabled !== false);
+        if (enabled.length > 0 && !enabled.some((m) => m.code === paymentMode)) {
+          setPaymentMode(enabled[0].code);
+        }
+      }
+
+      const rawTaxes = Array.isArray(taxesRes?.data?.taxes)
+        ? taxesRes.data.taxes
+        : Array.isArray(taxesRes?.data)
+        ? taxesRes.data
+        : [];
+      if (rawTaxes.length > 0) {
+        const selectedTax = rawTaxes.find((t) => t.rate === 5) || rawTaxes[0];
+        setTaxGroup(selectedTax);
+      }
+
+      const rawCharges = Array.isArray(chargesRes?.data?.charges)
+        ? chargesRes.data.charges
+        : Array.isArray(chargesRes?.data)
+        ? chargesRes.data
+        : [];
+      setChargeList(rawCharges);
+    });
+
     return () => {
       isMounted = false;
     };
@@ -98,11 +136,71 @@ export function BillingPage() {
   }
 
   const taxableAmount = Math.max(0, subtotal - discountAmount);
-  const cgstAmount = Math.round((taxableAmount * 2.5) / 100);
-  const sgstAmount = Math.round((taxableAmount * 2.5) / 100);
-  const rawTotal = taxableAmount + cgstAmount + sgstAmount;
+
+  // Dynamic GST calculation from configured Tax Group
+  const taxRate = taxGroup ? Number(taxGroup.rate) : 5;
+  const cgstRate = taxGroup?.cgstRate !== undefined ? Number(taxGroup.cgstRate) : taxRate / 2;
+  const sgstRate = taxGroup?.sgstRate !== undefined ? Number(taxGroup.sgstRate) : taxRate / 2;
+  const cgstAmount = Math.round((taxableAmount * cgstRate) / 100);
+  const sgstAmount = Math.round((taxableAmount * sgstRate) / 100);
+
+  // Dynamic applicable charges (Service Charge, Packaging Fee)
+  const currentOrderType = activeOrder?.orderType || 'DINE_IN';
+  const applicableCharges = useMemo(() => {
+    return (chargeList || [])
+      .filter((c) => {
+        if (c.isActive === false) return false;
+        if (c.applicableOrderTypes && c.applicableOrderTypes.length > 0) {
+          return c.applicableOrderTypes.includes(currentOrderType);
+        }
+        return true;
+      })
+      .map((c) => {
+        let amount = 0;
+        if (c.isPercentage) {
+          amount = Math.round((taxableAmount * (c.rate || 0)) / 100);
+        } else {
+          amount = Math.round((c.rate || 0) * 100);
+        }
+        return {
+          id: c._id || c.id || c.name,
+          name: c.name,
+          rate: c.rate,
+          isPercentage: c.isPercentage,
+          amount,
+        };
+      });
+  }, [chargeList, currentOrderType, taxableAmount]);
+
+  const totalChargesAmount = applicableCharges.reduce((sum, c) => sum + c.amount, 0);
+  const rawTotal = taxableAmount + cgstAmount + sgstAmount + totalChargesAmount;
   const roundOff = Math.round(rawTotal / 100) * 100 - rawTotal;
   const grandTotal = rawTotal + roundOff;
+
+  // Enabled payment modes from outlet configuration
+  const enabledModes = useMemo(() => {
+    if (!paymentModesList || paymentModesList.length === 0) {
+      return [
+        { code: 'CASH', name: 'Cash', icon: Banknote },
+        { code: 'UPI', name: 'UPI QR', icon: QrCode },
+        { code: 'CARD', name: 'Card', icon: CreditCard },
+        { code: 'DUE', name: 'Credit/Due', icon: Clock },
+      ];
+    }
+    return paymentModesList
+      .filter((m) => m.isEnabled !== false)
+      .map((m) => {
+        let Icon = CreditCard;
+        if (m.code === 'CASH') Icon = Banknote;
+        else if (m.code === 'UPI') Icon = QrCode;
+        else if (m.code === 'DUE') Icon = Clock;
+        return {
+          code: m.code,
+          name: m.name || m.code,
+          icon: Icon,
+        };
+      });
+  }, [paymentModesList]);
 
   const [cashTendered, setCashTendered] = useState(grandTotal);
   const [upiQrUrl, setUpiQrUrl] = useState('');
@@ -147,11 +245,14 @@ export function BillingPage() {
   const handleSettle = () => {
     const invoiceNo = `INV-2026-${Math.floor(Math.random() * 9000 + 1000)}`;
     const now = new Date();
+    const currentUser = useAuthStore.getState().user;
+    const cashierName = currentUser?.name || currentUser?.username || 'Counter Cashier';
 
     const invoicePayload = {
       invoiceNo,
       tableId,
       tableName,
+      orderType: activeOrder?.orderType || currentOrderType || 'DINE_IN',
       guestCount: activeOrder?.guestCount || currentTable?.guestCount || 2,
       outlet: outlet || undefined,
       outletName: outlet?.name || 'Restaurant POS',
@@ -162,31 +263,60 @@ export function BillingPage() {
       email: outlet?.email || '',
       address: outlet?.address || '',
       upiId: outlet?.upiId || '',
-      lines: billLines.map((l) => ({
-        name: l.name + (l.variantName ? ` (${l.variantName})` : ''),
-        qty: l.quantity,
-        price: l.unitPrice,
-        total: (l.unitPrice + ((l.addons || []).reduce((acc, a) => acc + (a.price || 0), 0))) * l.quantity,
-      })),
+      lines: billLines.map((l) => {
+        const addonsList = Array.isArray(l.addons)
+          ? l.addons.map((a) => ({
+              id: a.id || a._id,
+              name: a.name,
+              price: a.price || 0,
+            }))
+          : [];
+        const addonsTotalPerUnit = addonsList.reduce((acc, a) => acc + (a.price || 0), 0);
+        return {
+          id: l.id || l._id,
+          name: l.name,
+          variantName: l.variantName || null,
+          notes: l.notes || '',
+          qty: l.quantity,
+          unitPrice: l.unitPrice,
+          price: l.unitPrice,
+          addons: addonsList,
+          addonsTotal: addonsTotalPerUnit * l.quantity,
+          total: (l.unitPrice + addonsTotalPerUnit) * l.quantity,
+        };
+      }),
       subtotal,
       discount: discountAmount,
       discountObj: appliedDiscount,
+      discountReason: appliedDiscount?.reason || '',
       taxable: taxableAmount,
+      cgstRate,
+      sgstRate,
       cgst: cgstAmount,
       sgst: sgstAmount,
+      charges: applicableCharges,
+      chargesBreakdown: applicableCharges,
+      totalCharges: totalChargesAmount,
       roundOff,
       grandTotal,
       paymentMode,
+      cashTendered: paymentMode === 'CASH' ? cashTendered : grandTotal,
       changeReturned,
+      cardRef: paymentMode === 'CARD' ? cardRef : undefined,
       customerPhone,
       customerName,
+      deliveryAddress: activeOrder?.deliveryAddress || '',
       date: now.toLocaleDateString('en-IN'),
       time: now.toLocaleTimeString('en-IN'),
-      cashierName: 'Counter Cashier',
+      cashierName,
     };
 
     // Free the table and store the invoice in posStore
     settleBillAndFreeTable(tableId, invoicePayload);
+
+    try {
+      localStorage.setItem('pos_last_settled_invoice', JSON.stringify(invoicePayload));
+    } catch {}
 
     setSettledSuccess(invoicePayload);
   };
@@ -290,15 +420,36 @@ export function BillingPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {billLines.map((line) => {
-                  const lineGross = (line.unitPrice + ((line.addons || []).reduce((acc, a) => acc + (a.price || 0), 0))) * line.quantity;
+                  const addonsList = Array.isArray(line.addons) ? line.addons : [];
+                  const addonsTotal = addonsList.reduce((acc, a) => acc + (a.price || 0), 0);
+                  const lineGross = (line.unitPrice + addonsTotal) * line.quantity;
                   return (
                     <tr key={line.id} className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-2 sm:px-3 font-semibold text-slate-900 break-words">
-                        <div>{line.name} {line.variantName ? `(${line.variantName})` : ''}</div>
-                        {line.addons && line.addons.length > 0 && (
-                          <div className="text-[10px] text-slate-500 font-normal">
-                            + {line.addons.map((a) => a.name).join(', ')}
+                      <td className="py-2.5 px-2 sm:px-3 font-semibold text-slate-900 break-words max-w-[220px]">
+                        <div className="font-medium text-slate-900 leading-tight">
+                          <span>{line.name}</span>
+                          {line.variantName && (
+                            <span className="text-slate-600 font-normal ml-1 text-xs">
+                              ({line.variantName})
+                            </span>
+                          )}
+                        </div>
+                        {addonsList.length > 0 && (
+                          <div className="text-[11px] text-slate-600 font-normal mt-1 space-y-0.5 pl-1.5 border-l-2 border-slate-200">
+                            {addonsList.map((a, aIdx) => (
+                              <div key={aIdx} className="flex justify-between items-center text-slate-600">
+                                <span>+ {a.name}</span>
+                                {a.price > 0 && (
+                                  <span className="text-[10px] text-slate-500 font-medium ml-1">
+                                    +{formatPaiseToRupees(a.price)}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
                           </div>
+                        )}
+                        {line.notes && (
+                          <div className="text-[10px] text-amber-700 italic mt-0.5">Note: {line.notes}</div>
                         )}
                       </td>
                       <td className="py-2.5 px-1 sm:px-3 text-center whitespace-nowrap">{line.quantity}</td>
@@ -335,13 +486,20 @@ export function BillingPage() {
             <span>{formatPaiseToRupees(taxableAmount)}</span>
           </div>
 
+          {applicableCharges.map((c) => (
+            <div key={c.id} className="flex justify-between text-xs text-slate-600">
+              <span>{c.name} {c.isPercentage ? `(${c.rate}%)` : ''}</span>
+              <span>{formatPaiseToRupees(c.amount)}</span>
+            </div>
+          ))}
+
           <div className="flex justify-between text-xs text-slate-600">
-            <span>CGST (2.5%)</span>
+            <span>CGST ({cgstRate}%)</span>
             <span>{formatPaiseToRupees(cgstAmount)}</span>
           </div>
 
           <div className="flex justify-between text-xs text-slate-600">
-            <span>SGST (2.5%)</span>
+            <span>SGST ({sgstRate}%)</span>
             <span>{formatPaiseToRupees(sgstAmount)}</span>
           </div>
 
@@ -366,51 +524,26 @@ export function BillingPage() {
           <span className="text-base font-bold text-slate-900">{formatPaiseToRupees(grandTotal)}</span>
         </div>
 
-        {/* Mode Selector Tabs */}
-        <div className="grid grid-cols-4 gap-1.5 py-2.5 border-b border-slate-100">
-          <button
-            onClick={() => setPaymentMode('CASH')}
-            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${paymentMode === 'CASH'
-                ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-          >
-            <Banknote className="w-4 h-4 text-slate-700" />
-            <span className="text-xs">Cash</span>
-          </button>
-
-          <button
-            onClick={() => setPaymentMode('UPI')}
-            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${paymentMode === 'UPI'
-                ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-          >
-            <QrCode className="w-4 h-4 text-slate-700" />
-            <span className="text-xs">UPI QR</span>
-          </button>
-
-          <button
-            onClick={() => setPaymentMode('CARD')}
-            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${paymentMode === 'CARD'
-                ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-          >
-            <CreditCard className="w-4 h-4 text-slate-700" />
-            <span className="text-xs">Card</span>
-          </button>
-
-          <button
-            onClick={() => setPaymentMode('DUE')}
-            className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all ${paymentMode === 'DUE'
-                ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-          >
-            <Clock className="w-4 h-4 text-slate-700" />
-            <span className="text-xs">Credit/Due</span>
-          </button>
+        {/* Mode Selector Tabs (Reflects enabled/disabled status) */}
+        <div className="flex flex-wrap gap-1.5 py-2.5 border-b border-slate-100">
+          {enabledModes.map((m) => {
+            const Icon = m.icon;
+            const isSelected = paymentMode === m.code;
+            return (
+              <button
+                key={m.code}
+                onClick={() => setPaymentMode(m.code)}
+                className={`p-2 rounded-lg border text-center flex-1 min-w-[70px] flex flex-col items-center justify-center gap-1 transition-all ${
+                  isSelected
+                    ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Icon className="w-4 h-4 text-slate-700" />
+                <span className="text-xs">{m.name}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Dynamic Mode Forms */}

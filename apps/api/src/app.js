@@ -21,6 +21,7 @@ import { reportsRoutes } from './modules/reports/reports.routes.js';
 import { auditRoutes } from './modules/audit/audit.routes.js';
 import { syncRoutes } from './modules/sync/sync.routes.js';
 import { superAdminRoutes } from './modules/super-admin/super-admin.routes.js';
+import { notificationRoutes } from './modules/notifications/notification.routes.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import fastifyStatic from '@fastify/static';
@@ -94,6 +95,7 @@ export async function buildApp(opts = {}) {
   await fastify.register(auditRoutes, { prefix: '/v1/audit-logs' });
   await fastify.register(syncRoutes, { prefix: '/v1/sync' });
   await fastify.register(superAdminRoutes, { prefix: '/v1/super-admin' });
+  await fastify.register(notificationRoutes, { prefix: '/v1/notifications' });
 
   // Serve static frontend SPA if built (e.g. in single-container deployment)
   const webDistPath = path.resolve(process.cwd(), 'apps/web/dist');

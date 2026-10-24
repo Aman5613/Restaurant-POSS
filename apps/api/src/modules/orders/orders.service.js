@@ -1,4 +1,4 @@
-import { Order, DiningTable, TableSession, KOT, PrintJob, KitchenStation, NumberingSeries, Item } from '../../models/index.js';
+import { Order, DiningTable, TableSession, KOT, PrintJob, KitchenStation, NumberingSeries, Item, User } from '../../models/index.js';
 import { ORDER_STATUS, TABLE_STATUS, KOT_STATUS, PRINT_JOB_STATUS } from '@pos/shared';
 
 export class OrdersService {
@@ -263,6 +263,18 @@ export class OrdersService {
   }
 
   async sendToKitchen({ outletId, orderId, createdBy }) {
+    // Multi-tenant check: KDS/cook must be created for this outlet
+    const cookExists = await User.findOne({
+      outletId,
+      role: 'cook',
+      isActive: true,
+    });
+    if (!cookExists) {
+      const error = new Error('Cannot send KOT: No Cook/Chef (KDS) staff exists for this store. Please create a Cook staff account in Admin first.');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const order = await this.getOrderById({ outletId, orderId });
 
     const draftLines = order.lines.filter((l) => l.status === 'DRAFT');

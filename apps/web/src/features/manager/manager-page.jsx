@@ -81,6 +81,7 @@ export function ManagerPage() {
   const [formIsVeg, setFormIsVeg] = useState(true);
   const [formStationId, setFormStationId] = useState('');
   const [formDescription, setFormDescription] = useState('');
+  const [formImageUrl, setFormImageUrl] = useState('');
   const [formVariants, setFormVariants] = useState([]);
   const [formAddons, setFormAddons] = useState([]);
 
@@ -129,6 +130,7 @@ export function ManagerPage() {
           stationId: typeof it.stationId === 'object' ? it.stationId?._id : it.stationId,
           stationName: typeof it.stationId === 'object' ? it.stationId?.name : '',
           description: it.description || '',
+          imageUrl: it.imageUrl || '',
           variants: it.variants || [],
           addons: it.addons || [],
         }));
@@ -223,6 +225,7 @@ export function ManagerPage() {
     setFormIsVeg(true);
     setFormStationId(stations[0]?._id || '');
     setFormDescription('');
+    setFormImageUrl('');
     setFormVariants([]);
     setFormAddons([]);
     setIsAddModalOpen(true);
@@ -238,6 +241,7 @@ export function ManagerPage() {
     setFormIsVeg(item.isVeg !== false);
     setFormStationId(item.stationId || '');
     setFormDescription(item.description || '');
+    setFormImageUrl(item.imageUrl || '');
     setFormVariants(
       (item.variants || []).map((v, i) => ({
         id: v.id || v._id || `v_${Date.now()}_${i}`,
@@ -302,6 +306,7 @@ export function ManagerPage() {
       isVeg: formIsVeg,
       isAvailable: true,
       description: formDescription.trim() || undefined,
+      imageUrl: formImageUrl.trim() || undefined,
       stationId: formStationId || undefined,
       variants: parsedVariants,
       addons: parsedAddons,
@@ -323,6 +328,7 @@ export function ManagerPage() {
         stationId: payload.stationId,
         stationName: matchedStation?.name || '',
         description: payload.description || '',
+        imageUrl: payload.imageUrl || '',
         variants: parsedVariants,
         addons: parsedAddons,
       };
@@ -345,6 +351,7 @@ export function ManagerPage() {
         stationId: payload.stationId,
         stationName: matchedStation?.name || '',
         description: payload.description || '',
+        imageUrl: payload.imageUrl || '',
         variants: parsedVariants,
         addons: parsedAddons,
       };
@@ -395,6 +402,7 @@ export function ManagerPage() {
       basePrice: pricePaise,
       isVeg: formIsVeg,
       description: formDescription.trim(),
+      imageUrl: formImageUrl.trim() || undefined,
       stationId: formStationId || undefined,
       variants: parsedVariants,
       addons: parsedAddons,
@@ -414,6 +422,7 @@ export function ManagerPage() {
       ...payload,
       categoryName: matchedCategory?.name || itemToEdit.categoryName,
       stationName: matchedStation?.name || '',
+      imageUrl: payload.imageUrl || '',
       variants: parsedVariants,
       addons: parsedAddons,
     };
@@ -895,6 +904,18 @@ export function ManagerPage() {
                   }`}
               >
                 <CardHeader className="p-4 pb-2">
+                  {item.imageUrl && (
+                    <div className="w-full h-28 mb-2 overflow-hidden rounded-lg bg-slate-100 border border-slate-200">
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -1421,6 +1442,39 @@ export function ManagerPage() {
                     className="h-9 mt-1 text-xs"
                   />
                 </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block text-xs mb-1">Item Photo / Image (Optional)</label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      placeholder="Paste Image URL (https://...) or choose file"
+                      value={formImageUrl}
+                      onChange={(e) => setFormImageUrl(e.target.value)}
+                      className="h-9 text-xs flex-1"
+                    />
+                    <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shrink-0">
+                      Browse
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setFormImageUrl(ev.target?.result || '');
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                    {formImageUrl && (
+                      <div className="h-9 w-9 rounded-lg border border-slate-200 overflow-hidden shrink-0 bg-slate-50 flex items-center justify-center">
+                        <img src={formImageUrl} alt="preview" className="h-full w-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </CardContent>
 
               <div className="flex justify-end gap-2 border-t border-slate-100 p-4 bg-slate-50 rounded-b-2xl">
@@ -1745,6 +1799,39 @@ export function ManagerPage() {
                     onChange={(e) => setFormDescription(e.target.value)}
                     className="h-9 mt-1 text-xs"
                   />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block text-xs mb-1">Item Photo / Image (Optional)</label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      placeholder="Paste Image URL (https://...) or choose file"
+                      value={formImageUrl}
+                      onChange={(e) => setFormImageUrl(e.target.value)}
+                      className="h-9 text-xs flex-1"
+                    />
+                    <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shrink-0">
+                      Browse
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setFormImageUrl(ev.target?.result || '');
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                    {formImageUrl && (
+                      <div className="h-9 w-9 rounded-lg border border-slate-200 overflow-hidden shrink-0 bg-slate-50 flex items-center justify-center">
+                        <img src={formImageUrl} alt="preview" className="h-full w-full object-cover" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
 

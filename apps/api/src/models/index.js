@@ -33,3 +33,4 @@ export * from './BusinessDay.js';
 export * from './Shift.js';
 export * from './CashMovement.js';
 export * from './Customer.js';
+export * from './PushSubscription.js';

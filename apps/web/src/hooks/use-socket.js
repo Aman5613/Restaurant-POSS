@@ -2,7 +2,14 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuthStore } from '../stores/auth-store';
 import { usePosStore } from '../stores/pos-store';
-import { playKotChime, playReadyChime } from '../lib/sound-effects';
+import {
+  playKotChime,
+  playReadyChime,
+  startKotRinger,
+  stopKotRinger,
+  startReadyRinger,
+  stopReadyRinger,
+} from '../lib/sound-effects';
 import { SOCKET_EVENTS } from '@pos/shared';
 
 const SOCKET_SERVER_URL =
@@ -137,7 +144,7 @@ export function useSocket() {
     function onKotDispatched(data) {
       const currentUser = userRef.current;
       if (currentUser?.role === 'cook' || currentUser?.role === 'manager' || !currentUser?.role) {
-        playKotChime();
+        startKotRinger();
       }
 
       const rawKots = data?.createdKots
@@ -178,6 +185,7 @@ export function useSocket() {
       if (data?.kotId) {
         updateKotStatus(data.kotId, 'PREPARING');
       }
+      stopKotRinger();
     }
 
     function onKotReady(data) {
@@ -190,7 +198,7 @@ export function useSocket() {
         currentUser?.role === 'biller' ||
         currentUser?.role === 'manager'
       ) {
-        playReadyChime();
+        startReadyRinger();
       }
     }
 
@@ -297,12 +305,15 @@ export function useSocket() {
   );
 
   const markKotReady = useCallback(
-    (kotId) => {
+    (kotId, meta = {}) => {
       if (socketInstance) {
         socketInstance.emit(SOCKET_EVENTS.KOT_READY, {
           kotId,
           outletId: user?.outletId || 'default-outlet',
           readyBy: user?.name || 'Cook',
+          tableNumber: meta.tableNumber,
+          itemName: meta.itemName,
+          kotNumber: meta.kotNumber,
         });
       }
       updateKotStatus(kotId, 'READY');

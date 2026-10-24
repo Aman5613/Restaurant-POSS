@@ -127,3 +127,34 @@ export function stopKotRinger() {
 export function isKotRinging() {
   return ringerTimer !== null;
 }
+
+let readyRingerTimer = null;
+
+/**
+ * Start repeating the Ready chime until stopped by captain/biller acknowledgment
+ */
+export function startReadyRinger(intervalMs = 4000) {
+  playReadyChime();
+  if (!readyRingerTimer) {
+    readyRingerTimer = setInterval(() => {
+      playReadyChime();
+    }, intervalMs);
+  }
+}
+
+/**
+ * Stop repeating the Ready chime
+ */
+export function stopReadyRinger() {
+  if (readyRingerTimer) {
+    clearInterval(readyRingerTimer);
+    readyRingerTimer = null;
+  }
+}
+
+/**
+ * Check if the Ready alarm is currently ringing
+ */
+export function isReadyRinging() {
+  return readyRingerTimer !== null;
+}

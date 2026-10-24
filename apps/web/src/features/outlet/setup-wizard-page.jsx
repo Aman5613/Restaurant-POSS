@@ -7,25 +7,34 @@ import { Badge } from '@/components/ui/badge';
 import {
   CheckCircle2,
   Building,
+  LayoutGrid,
+  UtensilsCrossed,
+  Users,
   Percent,
-  CreditCard,
-  Receipt,
   ArrowRight,
   ArrowLeft,
   Loader2,
   AlertCircle,
+  Clock,
+  KeyRound,
+  ShieldCheck,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth-store';
+import { usePosStore } from '@/stores/pos-store';
 
 export function SetupWizardPage() {
   const navigate = useNavigate();
+  const { user, updateUser } = useAuthStore();
+  const { switchOutlet } = usePosStore();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
 
-  // Form State (initialized empty, loaded from API)
+  // Step 1: Store Profile & Timings
   const [profile, setProfile] = useState({
     name: '',
     legalName: '',
@@ -39,8 +48,32 @@ export function SetupWizardPage() {
     state: '',
     stateCode: '27',
     pincode: '',
+    openTime: '09:00',
+    closeTime: '23:00',
   });
 
+  // Step 2: Floor & Tables
+  const [floorPlan, setFloorPlan] = useState({
+    seedFloor: true,
+    areasCount: 3,
+    tablesCount: 14,
+  });
+
+  // Step 3: Menu & Categories
+  const [menuSetup, setMenuSetup] = useState({
+    seedStarterMenu: true,
+    categoriesCount: 4,
+    itemsCount: 8,
+  });
+
+  // Step 4: Staff Users & PINs
+  const [staffList, setStaffList] = useState([
+    { role: 'biller', name: 'Cashier / Biller', phone: '', pin: '3333', enabled: true },
+    { role: 'captain', name: 'Service Captain', phone: '', pin: '4444', enabled: true },
+    { role: 'cook', name: 'Head Chef / Cook', phone: '', pin: '5555', enabled: true },
+  ]);
+
+  // Step 5: Charges & Taxes
   const [serviceCharge, setServiceCharge] = useState({
     enabled: true,
     rate: 5,
@@ -51,41 +84,41 @@ export function SetupWizardPage() {
     rate: 20,
   });
 
-  // Real backend data fetched for preview steps
   const [taxGroups, setTaxGroups] = useState([]);
-  const [paymentModes, setPaymentModes] = useState([]);
 
-  // Fetch real outlet details & config on mount
+  // Fetch existing outlet details on mount
   useEffect(() => {
     let isMounted = true;
     async function loadInitialData() {
       setIsLoading(true);
       setError(null);
       try {
-        const [profileRes, taxesRes, modesRes] = await Promise.all([
+        const [profileRes, taxesRes] = await Promise.all([
           apiClient.get('/v1/outlet/profile').catch(() => null),
           apiClient.get('/v1/outlet/tax-groups').catch(() => null),
-          apiClient.get('/v1/outlet/payment-modes').catch(() => null),
         ]);
 
         if (!isMounted) return;
 
         if (profileRes?.data?.outlet || profileRes?.data) {
           const o = profileRes.data.outlet || profileRes.data;
-          setProfile({
-            name: o.name || '',
-            legalName: o.legalName || '',
-            phone: o.phone || '',
-            email: o.email || '',
-            gstin: o.gstin || '',
-            fssaiNumber: o.fssaiNumber || '',
-            upiId: o.upiId || '',
-            line1: o.address?.line1 || '',
-            city: o.address?.city || '',
-            state: o.address?.state || '',
-            stateCode: o.address?.stateCode || '27',
-            pincode: o.address?.pincode || '',
-          });
+          setProfile((prev) => ({
+            ...prev,
+            name: o.name || prev.name,
+            legalName: o.legalName || o.name || prev.legalName,
+            phone: o.phone || user?.phone || prev.phone,
+            email: o.email || user?.email || prev.email,
+            gstin: o.gstin || prev.gstin,
+            fssaiNumber: o.fssaiNumber || prev.fssaiNumber,
+            upiId: o.upiId || prev.upiId,
+            line1: o.address?.line1 || prev.line1,
+            city: o.address?.city || prev.city,
+            state: o.address?.state || prev.state,
+            stateCode: o.address?.stateCode || prev.stateCode,
+            pincode: o.address?.pincode || prev.pincode,
+            openTime: o.operatingHours?.openTime || '09:00',
+            closeTime: o.operatingHours?.closeTime || '23:00',
+          }));
         }
 
         const taxes = Array.isArray(taxesRes?.data?.taxes)
@@ -94,13 +127,6 @@ export function SetupWizardPage() {
           ? taxesRes.data
           : [];
         setTaxGroups(taxes);
-
-        const modes = Array.isArray(modesRes?.data?.paymentModes)
-          ? modesRes.data.paymentModes
-          : Array.isArray(modesRes?.data)
-          ? modesRes.data
-          : [];
-        setPaymentModes(modes);
       } catch (err) {
         if (isMounted) setError(err.message || 'Failed to load existing outlet details.');
       } finally {
@@ -112,25 +138,29 @@ export function SetupWizardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   const handleFinishWizard = async () => {
     try {
       setIsSubmitting(true);
       setError(null);
 
-      // 1. Update outlet profile via real API
+      // 1. Update outlet profile & timings
       await apiClient.put('/v1/outlet/profile', {
-        name: profile.name,
-        legalName: profile.legalName,
-        phone: profile.phone,
+        name: profile.name || 'My Restaurant',
+        legalName: profile.legalName || profile.name || 'My Restaurant F&B',
+        phone: profile.phone || '9999999999',
         email: profile.email || undefined,
         gstin: profile.gstin || undefined,
         fssaiNumber: profile.fssaiNumber || undefined,
         upiId: profile.upiId || undefined,
+        operatingHours: {
+          openTime: profile.openTime || '09:00',
+          closeTime: profile.closeTime || '23:00',
+        },
         address: {
-          line1: profile.line1?.trim() || 'Main Road',
-          city: profile.city?.trim() || 'City',
+          line1: profile.line1?.trim() || 'Main Market Road',
+          city: profile.city?.trim() || 'City Center',
           state: profile.state?.trim() || 'State',
           stateCode: profile.stateCode?.trim() || '27',
           pincode: profile.pincode?.trim() || '400001',
@@ -138,10 +168,36 @@ export function SetupWizardPage() {
         isSetupCompleted: true,
       });
 
-      // 2. Pre-seed default taxes, payment modes, numbering series via real API
+      // 2. Pre-seed default taxes, payment modes, series
       await apiClient.post('/v1/outlet/seed-defaults', {}).catch(() => {});
 
-      // 3. Create service charge if enabled
+      // 3. Seed Floor & Tables if selected
+      if (floorPlan.seedFloor) {
+        await apiClient.post('/v1/tables/seed-demo', {}).catch(() => {});
+      }
+
+      // 4. Seed Menu & Categories if selected
+      if (menuSetup.seedStarterMenu) {
+        await apiClient.post('/v1/menu/seed-demo', {}).catch(() => {});
+      }
+
+      // 5. Create Staff Users with PINs
+      for (const staff of staffList) {
+        if (staff.enabled && staff.pin) {
+          const generatedPhone = staff.phone?.trim() || `9${Math.floor(100000000 + Math.random() * 900000000)}`;
+          await apiClient
+            .post('/v1/users', {
+              name: staff.name,
+              phone: generatedPhone,
+              role: staff.role,
+              pin: staff.pin,
+              password: 'StaffPassword@123',
+            })
+            .catch(() => {});
+        }
+      }
+
+      // 6. Create Service Charge if enabled
       if (serviceCharge.enabled && serviceCharge.rate > 0) {
         await apiClient
           .post('/v1/outlet/charges', {
@@ -154,7 +210,7 @@ export function SetupWizardPage() {
           .catch(() => {});
       }
 
-      // 4. Create packaging charge if enabled
+      // 7. Create Packaging Fee if enabled
       if (packagingCharge.enabled && packagingCharge.rate > 0) {
         await apiClient
           .post('/v1/outlet/charges', {
@@ -167,48 +223,56 @@ export function SetupWizardPage() {
           .catch(() => {});
       }
 
-      setNotification('Outlet setup completed successfully!');
-      setTimeout(() => navigate('/'), 1200);
+      // 8. Update client auth state and switch POS store to current outlet
+      updateUser({ isSetupCompleted: true, outletName: profile.name });
+      if (user?.outletId) {
+        switchOutlet(user.outletId);
+      }
+
+      setNotification('Store setup completed successfully! Launching your POS...');
+      setTimeout(() => navigate('/admin'), 1000);
     } catch (err) {
-      setError(err.data?.message || err.message || 'Wizard completion failed.');
+      setError(err.data?.message || err.message || 'Setup completion failed.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const steps = [
-    { id: 1, title: 'Outlet Profile', icon: Building },
-    { id: 2, title: 'GST Slabs', icon: Percent },
-    { id: 3, title: 'Charges', icon: Receipt },
-    { id: 4, title: 'Payment Modes', icon: CreditCard },
+    { id: 1, title: 'Store & Timings', icon: Building },
+    { id: 2, title: 'Floor & Tables', icon: LayoutGrid },
+    { id: 3, title: 'Menu Categories', icon: UtensilsCrossed },
+    { id: 4, title: 'Staff & PINs', icon: Users },
+    { id: 5, title: 'Taxes & Charges', icon: Percent },
   ];
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
+      <Card className="w-full max-w-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
         {notification && (
-          <div className="bg-emerald-600 text-white text-xs font-bold px-4 py-2 text-center animate-in fade-in">
+          <div className="bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 text-center animate-in fade-in flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
             {notification}
           </div>
         )}
 
-        <CardHeader className="border-b border-slate-100 pb-4 bg-slate-50/50">
+        <CardHeader className="border-b border-slate-100 pb-4 bg-slate-50/70">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-xl font-bold text-slate-900">Outlet Initial Setup Wizard</CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Step {currentStep} of {steps.length} — Configure your store fundamentals connected with API
+              <CardTitle className="text-xl font-bold text-slate-900">New Store Onboarding & Setup</CardTitle>
+              <CardDescription className="text-xs text-slate-500 mt-0.5">
+                Step {currentStep} of {steps.length} — {steps[currentStep - 1].title}
               </CardDescription>
             </div>
-            <Badge variant="secondary" className="font-mono text-xs bg-slate-200 text-slate-700">
-              Live API
+            <Badge variant="outline" className="font-mono text-xs bg-rose-50 text-rose-700 border-rose-200">
+              Required Setup
             </Badge>
           </div>
 
           {/* Stepper Progress */}
-          <div className="flex items-center justify-between pt-4">
+          <div className="flex items-center justify-between pt-4 overflow-x-auto pb-1 gap-2">
             {steps.map((s) => (
-              <div key={s.id} className="flex items-center gap-2">
+              <div key={s.id} className="flex items-center gap-2 shrink-0">
                 <div
                   className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     currentStep === s.id
@@ -237,54 +301,38 @@ export function SetupWizardPage() {
           {isLoading ? (
             <div className="py-16 text-center text-slate-500 space-y-2">
               <Loader2 className="w-8 h-8 animate-spin mx-auto text-rose-600" />
-              <p className="text-xs font-semibold">Loading real outlet configuration from API...</p>
+              <p className="text-xs font-semibold">Loading store configuration...</p>
             </div>
           ) : (
             <>
+              {/* STEP 1: Store Profile & Timings */}
               {currentStep === 1 && (
                 <div className="space-y-4">
-                  <h3 className="font-bold text-sm text-slate-900">Restaurant Profile & Government Registrations</h3>
+                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                    <Building className="w-4 h-4 text-rose-600" />
+                    Store Profile & Operating Timings
+                  </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-bold text-slate-700">Outlet Display Name *</label>
+                      <label className="text-xs font-bold text-slate-700">Restaurant / Outlet Name *</label>
                       <Input
                         value={profile.name}
-                        placeholder="e.g. Spice Garden"
+                        placeholder="e.g. Spice Garden Restaurant"
                         className="text-xs h-9 mt-1"
                         onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-700">Legal Business Name *</label>
+                      <label className="text-xs font-bold text-slate-700">Legal Entity Name</label>
                       <Input
                         value={profile.legalName}
-                        placeholder="e.g. Spice Garden Foods Pvt Ltd"
+                        placeholder="e.g. Spice Garden Hospitality LLP"
                         className="text-xs h-9 mt-1"
                         onChange={(e) => setProfile({ ...profile, legalName: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-700">GSTIN (15 Digits)</label>
-                      <Input
-                        value={profile.gstin}
-                        placeholder="27AAAAA0000A1Z5"
-                        maxLength={15}
-                        className="text-xs h-9 mt-1 uppercase font-mono"
-                        onChange={(e) => setProfile({ ...profile, gstin: e.target.value.toUpperCase() })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-700">FSSAI License (14 Digits)</label>
-                      <Input
-                        value={profile.fssaiNumber}
-                        placeholder="11521034000123"
-                        maxLength={14}
-                        className="text-xs h-9 mt-1 font-mono"
-                        onChange={(e) => setProfile({ ...profile, fssaiNumber: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-700">Contact Phone *</label>
+                      <label className="text-xs font-bold text-slate-700">Contact Phone Number *</label>
                       <Input
                         value={profile.phone}
                         placeholder="9876543210"
@@ -293,20 +341,42 @@ export function SetupWizardPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-700">Email Address</label>
+                      <label className="text-xs font-bold text-slate-700">Official Email</label>
                       <Input
                         type="email"
                         value={profile.email}
-                        placeholder="contact@restaurant.com"
+                        placeholder="manager@spicegarden.com"
                         className="text-xs h-9 mt-1"
                         onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-500" /> Opening Time
+                      </label>
+                      <Input
+                        type="time"
+                        value={profile.openTime}
+                        className="text-xs h-9 mt-1 font-mono"
+                        onChange={(e) => setProfile({ ...profile, openTime: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-500" /> Closing Time
+                      </label>
+                      <Input
+                        type="time"
+                        value={profile.closeTime}
+                        className="text-xs h-9 mt-1 font-mono"
+                        onChange={(e) => setProfile({ ...profile, closeTime: e.target.value })}
                       />
                     </div>
                     <div className="sm:col-span-2">
                       <label className="text-xs font-bold text-slate-700">Street Address</label>
                       <Input
                         value={profile.line1}
-                        placeholder="Shop / Unit address"
+                        placeholder="Shop No. 4, Ground Floor, Linking Road"
                         className="text-xs h-9 mt-1"
                         onChange={(e) => setProfile({ ...profile, line1: e.target.value })}
                       />
@@ -321,88 +391,222 @@ export function SetupWizardPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-700">Pincode</label>
+                      <label className="text-xs font-bold text-slate-700">UPI ID for Direct QR Payments</label>
                       <Input
-                        value={profile.pincode}
-                        placeholder="400050"
-                        className="text-xs h-9 mt-1"
-                        onChange={(e) => setProfile({ ...profile, pincode: e.target.value })}
+                        value={profile.upiId}
+                        placeholder="merchant@upi"
+                        className="text-xs h-9 mt-1 font-mono"
+                        onChange={(e) => setProfile({ ...profile, upiId: e.target.value })}
                       />
                     </div>
                   </div>
                 </div>
               )}
 
+              {/* STEP 2: Floor & Table Setup */}
               {currentStep === 2 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-bold text-sm text-slate-900">Indian GST Slabs Configuration</h3>
-                      <p className="text-xs text-slate-500">
-                        Active tax slabs synchronized with the database:
+                      <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                        <LayoutGrid className="w-4 h-4 text-rose-600" />
+                        Dining Floor & Table Setup
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Configure dining areas and table layout for your floor view.
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-xs font-mono">
-                      {taxGroups.length} Slabs Configured
-                    </Badge>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {taxGroups.length > 0 ? (
-                      taxGroups.map((tax) => (
-                        <div key={tax._id || tax.id} className="p-3 border border-slate-200 rounded-lg bg-slate-50/70">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-sm text-slate-900">{tax.name}</span>
-                            <Badge className="bg-emerald-600 text-white text-[10px]">
-                              {tax.rate}%
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            CGST {tax.cgstRate || tax.cgst || (tax.rate / 2)}% + SGST {tax.sgstRate || tax.sgst || (tax.rate / 2)}%
-                            {tax.isInclusive ? ' • Inclusive' : ' • Exclusive'}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <>
-                        <div className="p-3 border border-slate-200 rounded-lg bg-slate-50/70">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-sm text-slate-900">GST 5% (Standard F&B)</span>
-                            <Badge className="bg-emerald-600 text-white text-[10px]">Pre-seeded</Badge>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">CGST 2.5% + SGST 2.5% (Restaurant dine-in & delivery)</p>
-                        </div>
-                        <div className="p-3 border border-slate-200 rounded-lg bg-slate-50/70">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-sm text-slate-900">GST 18% (Outdoor / Hotel)</span>
-                            <Badge className="bg-emerald-600 text-white text-[10px]">Pre-seeded</Badge>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">CGST 9% + SGST 9%</p>
-                        </div>
-                        <div className="p-3 border border-slate-200 rounded-lg bg-slate-50/70">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-sm text-slate-900">GST 12%</span>
-                            <Badge variant="secondary" className="text-[10px]">Pre-seeded</Badge>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">CGST 6% + SGST 6%</p>
-                        </div>
-                        <div className="p-3 border border-slate-200 rounded-lg bg-slate-50/70">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-sm text-slate-900">GST Exempt (0%)</span>
-                            <Badge variant="secondary" className="text-[10px]">Pre-seeded</Badge>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">Water and unbranded food items</p>
-                        </div>
-                      </>
-                    )}
+                  <div className="p-4 border-2 border-dashed border-rose-200 bg-rose-50/40 rounded-xl space-y-3">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id="seedFloorCheck"
+                        checked={floorPlan.seedFloor}
+                        onChange={(e) => setFloorPlan({ ...floorPlan, seedFloor: e.target.checked })}
+                        className="mt-1 rounded border-slate-300 text-rose-600 focus:ring-rose-500 h-4 w-4"
+                      />
+                      <div>
+                        <label htmlFor="seedFloorCheck" className="font-bold text-sm text-slate-900 cursor-pointer">
+                          Auto-generate Standard Dining Floor Layout
+                        </label>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          Automatically generates 3 zoned sections with 14 dining tables ready for immediate service:
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 pl-7">
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                        <div className="text-xs font-bold text-slate-800">Ground Floor (AC Hall)</div>
+                        <div className="text-[11px] text-slate-500 mt-1">7 Tables (T1 to T7)</div>
+                        <Badge variant="secondary" className="mt-2 text-[10px]">Family & Standard</Badge>
+                      </div>
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                        <div className="text-xs font-bold text-slate-800">Rooftop Garden</div>
+                        <div className="text-[11px] text-slate-500 mt-1">4 Tables (R1 to R4)</div>
+                        <Badge variant="secondary" className="mt-2 text-[10px]">Outdoor / Scenic</Badge>
+                      </div>
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                        <div className="text-xs font-bold text-slate-800">Bar & High Stools</div>
+                        <div className="text-[11px] text-slate-500 mt-1">3 Tables (B1 to B3)</div>
+                        <Badge variant="secondary" className="mt-2 text-[10px]">Cocktails & Quick</Badge>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
+              {/* STEP 3: Menu & Categories */}
               {currentStep === 3 && (
                 <div className="space-y-4">
-                  <h3 className="font-bold text-sm text-slate-900">Operational Charges & Packaging</h3>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                      <UtensilsCrossed className="w-4 h-4 text-rose-600" />
+                      Menu Categories & Items
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Set up your menu catalogue with categories and starters.
+                    </p>
+                  </div>
+
+                  <div className="p-4 border-2 border-dashed border-rose-200 bg-rose-50/40 rounded-xl space-y-3">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id="seedMenuCheck"
+                        checked={menuSetup.seedStarterMenu}
+                        onChange={(e) => setMenuSetup({ ...menuSetup, seedStarterMenu: e.target.checked })}
+                        className="mt-1 rounded border-slate-300 text-rose-600 focus:ring-rose-500 h-4 w-4"
+                      />
+                      <div>
+                        <label htmlFor="seedMenuCheck" className="font-bold text-sm text-slate-900 cursor-pointer">
+                          Seed Starter Menu Catalogue (Categories & Popular Items)
+                        </label>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          Populates your store with standard F&B categories and bestseller dishes:
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 pl-7">
+                      <div className="p-2.5 bg-white border border-slate-200 rounded-lg">
+                        <div className="text-xs font-bold text-slate-800">Appetizers</div>
+                        <div className="text-[11px] text-slate-500">Paneer Tikka, Malai Tikka</div>
+                      </div>
+                      <div className="p-2.5 bg-white border border-slate-200 rounded-lg">
+                        <div className="text-xs font-bold text-slate-800">Main Course</div>
+                        <div className="text-[11px] text-slate-500">Dal Makhani, Butter Chicken</div>
+                      </div>
+                      <div className="p-2.5 bg-white border border-slate-200 rounded-lg">
+                        <div className="text-xs font-bold text-slate-800">Breads & Rice</div>
+                        <div className="text-[11px] text-slate-500">Butter Naan, Biryani</div>
+                      </div>
+                      <div className="p-2.5 bg-white border border-slate-200 rounded-lg">
+                        <div className="text-xs font-bold text-slate-800">Beverages</div>
+                        <div className="text-[11px] text-slate-500">Mojito, Fresh Lime Soda</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4: Staff Users & Device PINs */}
+              {currentStep === 4 && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-rose-600" />
+                      Staff Roles & Quick PIN Login Setup
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Configure initial staff users and assign fast 4-digit PINs for tablet and KDS terminals:
+                    </p>
+                  </div>
+
                   <div className="space-y-3">
+                    {staffList.map((staff, idx) => (
+                      <div
+                        key={staff.role}
+                        className="p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs uppercase">
+                            {staff.role[0]}
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-slate-900 capitalize flex items-center gap-2">
+                              {staff.role} Terminal Account
+                              <Badge variant="secondary" className="text-[10px] py-0 uppercase">
+                                {staff.role === 'cook' ? 'KDS Screen' : staff.role === 'captain' ? 'Order Taking' : 'Billing'}
+                              </Badge>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {staff.role === 'cook'
+                                ? 'Kitchen cook sees live KOT cards & acknowledges preparation'
+                                : staff.role === 'captain'
+                                ? 'Waitstaff takes table orders & fires tickets'
+                                : 'Cashier handles settlements, discounts, and print bills'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="text-xs font-bold text-slate-600">PIN:</span>
+                            <Input
+                              value={staff.pin}
+                              maxLength={4}
+                              className="w-16 h-8 text-center text-xs font-mono font-bold"
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                const next = [...staffList];
+                                next[idx].pin = val;
+                                setStaffList(next);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 5: Taxes & Charges */}
+              {currentStep === 5 && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                      <Percent className="w-4 h-4 text-rose-600" />
+                      Taxes, Service Charges & Packaging
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Configure mandatory Indian GST slabs and optional restaurant service fee:
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3 border border-slate-200 rounded-lg bg-slate-50/70">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm text-slate-900">GST 5% (Standard Restaurant)</span>
+                        <Badge className="bg-emerald-600 text-white text-[10px]">CGST 2.5% + SGST 2.5%</Badge>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Default slab for all F&B food & beverage orders</p>
+                    </div>
+
+                    <div className="p-3 border border-slate-200 rounded-lg bg-slate-50/70">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm text-slate-900">GST 18% (Outdoor / Hotel)</span>
+                        <Badge className="bg-slate-700 text-white text-[10px]">CGST 9% + SGST 9%</Badge>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Applicable for star hotels & outdoor events</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between p-3.5 border border-slate-200 rounded-xl bg-slate-50/50">
                       <div>
                         <div className="flex items-center gap-2">
@@ -445,7 +649,7 @@ export function SetupWizardPage() {
                             Parcel / Packaging Fee
                           </label>
                         </div>
-                        <p className="text-xs text-slate-500 pl-6 mt-0.5">Fixed fee per takeaway packaging</p>
+                        <p className="text-xs text-slate-500 pl-6 mt-0.5">Fixed fee per takeaway or delivery order</p>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-bold text-slate-700">₹</span>
@@ -461,53 +665,11 @@ export function SetupWizardPage() {
                   </div>
                 </div>
               )}
-
-              {currentStep === 4 && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-bold text-sm text-slate-900">Tender & Payment Modes</h3>
-                      <p className="text-xs text-slate-500">Active settlement methods available at billing counter:</p>
-                    </div>
-                    <Badge variant="outline" className="text-xs font-mono">
-                      {paymentModes.length ? `${paymentModes.length} Modes in API` : 'Default 5 Modes'}
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {paymentModes.length > 0 ? (
-                      paymentModes.map((mode) => (
-                        <div
-                          key={mode._id || mode.id || mode.code}
-                          className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50/50"
-                        >
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                            <span className="text-xs font-bold text-slate-800">{mode.name}</span>
-                          </div>
-                          <Badge variant="secondary" className="text-[10px] uppercase font-mono">
-                            {mode.code}
-                          </Badge>
-                        </div>
-                      ))
-                    ) : (
-                      ['Cash (Auto-open drawer)', 'Dynamic UPI / QR', 'Credit & Debit Card', 'Customer Dues (Khata)', 'Complimentary / Tasting'].map(
-                        (mode, i) => (
-                          <div key={i} className="flex items-center gap-2 p-3 border border-slate-200 rounded-lg bg-slate-50/50">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                            <span className="text-xs font-bold text-slate-800">{mode}</span>
-                          </div>
-                        )
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </CardContent>
 
-        <CardFooter className="flex justify-between border-t border-slate-100 p-4 bg-slate-50/50">
+        <CardFooter className="flex justify-between border-t border-slate-100 p-4 bg-slate-50/70">
           <Button
             type="button"
             variant="outline"
@@ -542,10 +704,13 @@ export function SetupWizardPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                  Finalizing Setup...
+                  Finalizing Store Setup...
                 </>
               ) : (
-                'Complete & Launch POS'
+                <>
+                  <ShieldCheck className="w-4 h-4 mr-1.5" />
+                  Complete Setup & Launch POS
+                </>
               )}
             </Button>
           )}

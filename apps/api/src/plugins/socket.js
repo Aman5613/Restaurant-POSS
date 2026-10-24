@@ -2,6 +2,9 @@ import fp from 'fastify-plugin';
 import { Server } from 'socket.io';
 import { env } from '../config/env.js';
 import { SOCKET_EVENTS } from '@pos/shared';
+import { NotificationService } from '../modules/notifications/notification.service.js';
+
+const notificationService = new NotificationService();
 
 async function socketPlugin(fastify, _opts) {
   const io = new Server(fastify.server, {
@@ -154,6 +157,12 @@ async function socketPlugin(fastify, _opts) {
       }
       socket.to(`outlet:${outletId}`).emit(SOCKET_EVENTS.KOT_DISPATCHED, data);
       socket.to(`outlet:${outletId}:kitchen`).emit(SOCKET_EVENTS.KOT_DISPATCHED, data);
+
+      // Trigger Web Push notification for Cook & Kitchen devices
+      const kotsToPush = Array.isArray(kotsToAdd) && kotsToAdd.length > 0 ? kotsToAdd : [data];
+      for (const k of kotsToPush) {
+        notificationService.notifyNewKot(outletId, k).catch(() => {});
+      }
     });
 
     // Kitchen acknowledgment flow
@@ -170,6 +179,9 @@ async function socketPlugin(fastify, _opts) {
       if (outletId) {
         io.to(`outlet:${outletId}`).emit(SOCKET_EVENTS.KOT_READY, data);
         io.to(`outlet:${outletId}:service`).emit(SOCKET_EVENTS.KOT_READY, data);
+
+        // Trigger Web Push notification for Captain, Biller & Manager devices
+        notificationService.notifyFoodReady(outletId, data).catch(() => {});
       }
     });
 

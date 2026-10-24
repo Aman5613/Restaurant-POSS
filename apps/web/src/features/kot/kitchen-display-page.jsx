@@ -117,9 +117,18 @@ export function KitchenDisplayPage() {
       // Local fallback
     }
 
-    markKotReady(targetId);
+    const dishSummary = (kot.lines || kot.items || [])
+      .map((l) => `${l.quantity || 1}x ${l.name}`)
+      .slice(0, 3)
+      .join(', ');
+
+    markKotReady(targetId, {
+      tableNumber: kot.tableName || kot.tableNumber || 'Table',
+      itemName: dishSummary || 'Order',
+      kotNumber: kot.kotNo || targetId,
+    });
     playReadyChime();
-    notify(`KOT #${kot.kotNo || targetId} marked READY! Pickup chime sent to service staff.`);
+    notify(`KOT #${kot.kotNo || targetId} marked READY! Pickup alert sent to Captains.`);
   };
 
   const handleReprint = async () => {

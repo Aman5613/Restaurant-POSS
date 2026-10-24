@@ -7,6 +7,11 @@ import {
   Printer,
   Device,
   OutletSetting,
+  Category,
+  KitchenStation,
+  Item,
+  Area,
+  DiningTable,
 } from '../../models/index.js';
 
 export class OutletService {
@@ -209,6 +214,103 @@ export class OutletService {
       await NumberingSeries.findOneAndUpdate(
         { outletId, docType: s.docType },
         { ...s, outletId },
+        { upsert: true }
+      );
+    }
+  }
+
+  // Pre-seed standard kitchen stations, menu catalog and dining tables for any store
+  async seedStandardCatalogAndTables(outletId) {
+    // 1. Kitchen Stations
+    const stationMain = await KitchenStation.findOneAndUpdate(
+      { outletId, name: 'Main Kitchen' },
+      { outletId, name: 'Main Kitchen', isActive: true },
+      { upsert: true, new: true }
+    );
+    const stationGrill = await KitchenStation.findOneAndUpdate(
+      { outletId, name: 'Tandoor & Grill' },
+      { outletId, name: 'Tandoor & Grill', isActive: true },
+      { upsert: true, new: true }
+    );
+    const stationBar = await KitchenStation.findOneAndUpdate(
+      { outletId, name: 'Bar & Beverages' },
+      { outletId, name: 'Bar & Beverages', isActive: true },
+      { upsert: true, new: true }
+    );
+
+    // 2. Categories
+    const catStarters = await Category.findOneAndUpdate(
+      { outletId, name: 'Starters & Appetizers' },
+      { outletId, name: 'Starters & Appetizers', sortOrder: 1, isActive: true },
+      { upsert: true, new: true }
+    );
+    const catMains = await Category.findOneAndUpdate(
+      { outletId, name: 'Curries & Main Course' },
+      { outletId, name: 'Curries & Main Course', sortOrder: 2, isActive: true },
+      { upsert: true, new: true }
+    );
+    const catBreads = await Category.findOneAndUpdate(
+      { outletId, name: 'Breads & Rice' },
+      { outletId, name: 'Breads & Rice', sortOrder: 3, isActive: true },
+      { upsert: true, new: true }
+    );
+    const catDesserts = await Category.findOneAndUpdate(
+      { outletId, name: 'Desserts & Beverages' },
+      { outletId, name: 'Desserts & Beverages', sortOrder: 4, isActive: true },
+      { upsert: true, new: true }
+    );
+
+    // 3. Standard Menu Items
+    const defaultMenuItems = [
+      { name: 'Paneer Tikka Angara', basePrice: 28000, categoryId: catStarters._id, stationId: stationGrill._id, isVeg: true },
+      { name: 'Crispy Corn Salt & Pepper', basePrice: 21000, categoryId: catStarters._id, stationId: stationMain._id, isVeg: true },
+      { name: 'Chicken Malai Tikka', basePrice: 34000, categoryId: catStarters._id, stationId: stationGrill._id, isVeg: false },
+      { name: 'Veg Spring Rolls', basePrice: 19000, categoryId: catStarters._id, stationId: stationMain._id, isVeg: true },
+      { name: 'Paneer Butter Masala', basePrice: 32000, categoryId: catMains._id, stationId: stationMain._id, isVeg: true },
+      { name: 'Dal Makhani Gold', basePrice: 26000, categoryId: catMains._id, stationId: stationMain._id, isVeg: true },
+      { name: 'Butter Chicken Classic', basePrice: 38000, categoryId: catMains._id, stationId: stationMain._id, isVeg: false },
+      { name: 'Butter Naan', basePrice: 4500, categoryId: catBreads._id, stationId: stationGrill._id, isVeg: true },
+      { name: 'Garlic Naan', basePrice: 6500, categoryId: catBreads._id, stationId: stationGrill._id, isVeg: true },
+      { name: 'Jeera Rice', basePrice: 16000, categoryId: catBreads._id, stationId: stationMain._id, isVeg: true },
+      { name: 'Gulab Jamun (2 pcs)', basePrice: 9000, categoryId: catDesserts._id, stationId: stationMain._id, isVeg: true },
+      { name: 'Fresh Lime Soda', basePrice: 7000, categoryId: catDesserts._id, stationId: stationBar._id, isVeg: true },
+    ];
+
+    for (const itm of defaultMenuItems) {
+      await Item.findOneAndUpdate(
+        { outletId, name: itm.name },
+        { ...itm, outletId, isAvailable: true },
+        { upsert: true }
+      );
+    }
+
+    // 4. Standard Dining Areas & Tables
+    const mainArea = await Area.findOneAndUpdate(
+      { outletId, name: 'Ground Floor AC' },
+      { outletId, name: 'Ground Floor AC', sortOrder: 1 },
+      { upsert: true, new: true }
+    );
+    const terraceArea = await Area.findOneAndUpdate(
+      { outletId, name: 'Terrace Garden' },
+      { outletId, name: 'Terrace Garden', sortOrder: 2 },
+      { upsert: true, new: true }
+    );
+
+    const defaultTables = [
+      { tableNumber: 'T-01', name: 'Table 1', capacity: 4, areaId: mainArea._id, status: 'VACANT' },
+      { tableNumber: 'T-02', name: 'Table 2', capacity: 2, areaId: mainArea._id, status: 'VACANT' },
+      { tableNumber: 'T-03', name: 'Table 3', capacity: 6, areaId: mainArea._id, status: 'VACANT' },
+      { tableNumber: 'T-04', name: 'Table 4', capacity: 4, areaId: mainArea._id, status: 'VACANT' },
+      { tableNumber: 'T-05', name: 'Table 5', capacity: 8, areaId: mainArea._id, status: 'VACANT' },
+      { tableNumber: 'R-01', name: 'Table R1', capacity: 2, areaId: terraceArea._id, status: 'VACANT' },
+      { tableNumber: 'R-02', name: 'Table R2', capacity: 4, areaId: terraceArea._id, status: 'VACANT' },
+      { tableNumber: 'R-03', name: 'Table R3', capacity: 4, areaId: terraceArea._id, status: 'VACANT' },
+    ];
+
+    for (const tbl of defaultTables) {
+      await DiningTable.findOneAndUpdate(
+        { outletId, tableNumber: tbl.tableNumber },
+        { ...tbl, outletId, isActive: true },
         { upsert: true }
       );
     }

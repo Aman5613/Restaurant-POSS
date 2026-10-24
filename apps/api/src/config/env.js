@@ -13,6 +13,9 @@ const envSchema = z.object({
   REFRESH_TOKEN_EXPIRES_IN: z.string().default('7d'),
   COOKIE_SECRET: z.string().min(16).default('pos_super_secret_cookie_key_2026_dev_min16'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  VAPID_PUBLIC_KEY: z.string().default('BNpr5r-8-xC6XaUSnCGyn7C6G-dx61CbwFhZRJNoMckZmTq-9itL41ZZjw4aojh9E0C1dRWKrSguvl4c9jzCI5Q'),
+  VAPID_PRIVATE_KEY: z.string().default('Bcwrg64itsmrNlYgIvENUWaSXAwom9p0RWhlIYTEKvU'),
+  VAPID_SUBJECT: z.string().default('mailto:support@pos.internal'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

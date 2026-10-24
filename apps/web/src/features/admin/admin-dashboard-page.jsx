@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { ROLES } from '@pos/shared';
 import { apiClient } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth-store';
+import { usePosStore } from '@/stores/pos-store';
 
 export function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('outlet'); // 'outlet' | 'staff'
@@ -37,18 +39,24 @@ export function AdminDashboardPage() {
 
   // Outlet State
   const [outlet, setOutlet] = useState({
-    name: 'Spice Garden — Bandra West',
-    legalName: 'Spice Garden Pvt Ltd',
+    name: '',
+    legalName: '',
+    gstin: '',
+    fssaiNumber: '',
     logoUrl: '',
-    phone: '9876543210',
-    email: 'bandra@spicegarden.com',
-    upiId: 'spicegarden@okaxis',
+    phone: '',
+    email: '',
+    upiId: '',
+    operatingHours: {
+      openTime: '09:00',
+      closeTime: '23:00',
+    },
     address: {
-      line1: '12 Linking Road, Bandra West',
-      city: 'Mumbai',
-      state: 'Maharashtra',
+      line1: '',
+      city: '',
+      state: '',
       stateCode: '27',
-      pincode: '400050',
+      pincode: '',
     },
   });
 
@@ -81,22 +89,30 @@ export function AdminDashboardPage() {
       ]);
 
       if (profileRes?.data || profileRes?.outlet) {
-        const data = profileRes.data || profileRes.outlet;
-        setOutlet({
-          name: data.name || '',
-          legalName: data.legalName || '',
-          logoUrl: data.logoUrl || '',
-          phone: data.phone || '',
-          email: data.email || '',
-          upiId: data.upiId || '',
-          address: {
-            line1: data.address?.line1 || '',
-            city: data.address?.city || '',
-            state: data.address?.state || '',
-            stateCode: data.address?.stateCode || '27',
-            pincode: data.address?.pincode || '',
-          },
-        });
+        const data = profileRes?.data?.outlet || profileRes?.data?.data || profileRes?.data || profileRes?.outlet;
+        if (data && typeof data === 'object') {
+          setOutlet({
+            name: data.name || '',
+            legalName: data.legalName || '',
+            gstin: data.gstin || '',
+            fssaiNumber: data.fssaiNumber || data.fssai || '',
+            logoUrl: data.logoUrl || '',
+            phone: data.phone || '',
+            email: data.email || '',
+            upiId: data.upiId || '',
+            operatingHours: {
+              openTime: data.operatingHours?.openTime || '09:00',
+              closeTime: data.operatingHours?.closeTime || '23:00',
+            },
+            address: {
+              line1: data.address?.line1 || '',
+              city: data.address?.city || '',
+              state: data.address?.state || '',
+              stateCode: data.address?.stateCode || '27',
+              pincode: data.address?.pincode || '',
+            },
+          });
+        }
       }
 
       const rawUsers = Array.isArray(usersRes?.data)
@@ -164,14 +180,32 @@ export function AdminDashboardPage() {
     setIsSaving(true);
     try {
       const payload = {
-        ...outlet,
+        name: outlet.name?.trim(),
+        legalName: outlet.legalName?.trim() || undefined,
+        phone: outlet.phone?.trim(),
+        email: outlet.email?.trim() || undefined,
+        gstin: outlet.gstin?.trim() || undefined,
+        fssaiNumber: outlet.fssaiNumber?.trim() || undefined,
+        logoUrl: outlet.logoUrl?.trim() || undefined,
+        upiId: outlet.upiId?.trim() || undefined,
+        operatingHours: {
+          openTime: outlet.operatingHours?.openTime || '09:00',
+          closeTime: outlet.operatingHours?.closeTime || '23:00',
+        },
         address: {
-          ...outlet.address,
+          line1: outlet.address?.line1 || 'Main Street',
+          city: outlet.address?.city || 'City',
+          state: outlet.address?.state || 'State',
           stateCode: outlet.address?.stateCode || '27',
+          pincode: outlet.address?.pincode || '400001',
         },
       };
-      await apiClient.put('/v1/outlet/profile', payload);
-      notify('Outlet profile and UPI configurations updated successfully!');
+      const res = await apiClient.put('/v1/outlet/profile', payload);
+      const updated = res?.data?.outlet || res?.data || payload;
+      notify('Outlet profile and configurations saved successfully!');
+      useAuthStore.getState().updateUser({ outletName: updated.name });
+      usePosStore.getState().setOutlet(updated);
+      loadData();
     } catch (err) {
       notify(err.data?.message || err.message || 'Updated locally (offline mode)', 'info');
     } finally {
@@ -394,6 +428,68 @@ export function AdminDashboardPage() {
                         onChange={(e) => setOutlet({ ...outlet, legalName: e.target.value })}
                         placeholder="e.g. Spice Garden Hospitality Pvt Ltd"
                         className="text-xs h-9"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        GSTIN (15 Digits)
+                      </label>
+                      <Input
+                        value={outlet.gstin}
+                        onChange={(e) => setOutlet({ ...outlet, gstin: e.target.value.toUpperCase() })}
+                        placeholder="27AAAAA0000A1Z5"
+                        maxLength={15}
+                        className="text-xs h-9 font-mono uppercase"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        FSSAI License (14 Digits)
+                      </label>
+                      <Input
+                        value={outlet.fssaiNumber}
+                        onChange={(e) => setOutlet({ ...outlet, fssaiNumber: e.target.value })}
+                        placeholder="11521034000123"
+                        maxLength={14}
+                        className="text-xs h-9 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Opening Time
+                      </label>
+                      <Input
+                        type="time"
+                        value={outlet.operatingHours?.openTime || '09:00'}
+                        onChange={(e) =>
+                          setOutlet({
+                            ...outlet,
+                            operatingHours: { ...outlet.operatingHours, openTime: e.target.value },
+                          })
+                        }
+                        className="text-xs h-9 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Closing Time
+                      </label>
+                      <Input
+                        type="time"
+                        value={outlet.operatingHours?.closeTime || '23:00'}
+                        onChange={(e) =>
+                          setOutlet({
+                            ...outlet,
+                            operatingHours: { ...outlet.operatingHours, closeTime: e.target.value },
+                          })
+                        }
+                        className="text-xs h-9 font-mono"
                       />
                     </div>
                   </div>
