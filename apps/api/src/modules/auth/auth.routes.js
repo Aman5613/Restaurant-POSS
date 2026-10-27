@@ -10,6 +10,9 @@ export async function authRoutes(fastify, _opts) {
   fastify.post('/pin-login', controller.pinLogin.bind(controller));
   fastify.post('/refresh', controller.refresh.bind(controller));
   fastify.post('/logout', controller.logout.bind(controller));
+  /* TEMPORARY_QUICK_LOGIN */
+  fastify.get('/quick-login-options', controller.quickLoginOptions.bind(controller));
+  fastify.post('/quick-login', controller.quickLogin.bind(controller));
 
   // Protected auth routes (requires authentication)
   fastify.post(

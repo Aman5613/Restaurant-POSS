@@ -265,4 +265,134 @@ export class AuthService {
       maxDiscountPercent: user.maxDiscountPercent,
     };
   }
+
+  /* TEMPORARY_QUICK_LOGIN */
+  async getQuickLoginOptions() {
+    if (mongoose.connection?.readyState !== 1) {
+      return {
+        superAdmin: {
+          id: 'usr_super',
+          name: 'Platform Super Admin',
+          role: 'super-admin',
+          email: 'superadmin@pos.internal',
+        },
+        restaurants: [
+          {
+            id: 'default-outlet',
+            name: 'Demo Restaurant',
+            city: 'Mumbai',
+            users: [
+              { id: 'u_admin', name: 'Owner / Admin', role: 'admin' },
+              { id: 'u_manager', name: 'Store Manager', role: 'manager' },
+              { id: 'u_biller', name: 'Counter Cashier', role: 'biller' },
+              { id: 'u_captain', name: 'Service Captain', role: 'captain' },
+              { id: 'u_cook', name: 'Kitchen Chef', role: 'cook' },
+            ],
+          },
+        ],
+      };
+    }
+
+    const [superAdminUser, outlets, users] = await Promise.all([
+      User.findOne({ role: 'super-admin' }).lean(),
+      Outlet.find({}).sort({ createdAt: -1 }).lean(),
+      User.find({ role: { $ne: 'super-admin' }, isActive: true }).lean(),
+    ]);
+
+    const usersByOutlet = new Map();
+    for (const u of users) {
+      const outId = u.outletId?.toString();
+      if (!outId) continue;
+      if (!usersByOutlet.has(outId)) usersByOutlet.set(outId, []);
+      usersByOutlet.get(outId).push({
+        id: u._id.toString(),
+        name: u.name,
+        role: u.role,
+        phone: u.phone,
+        email: u.email,
+      });
+    }
+
+    const restaurants = outlets.map((o) => {
+      const oId = o._id.toString();
+      let outletUsers = usersByOutlet.get(oId) || [];
+      if (outletUsers.length === 0) {
+        outletUsers = [
+          { id: `demo_admin_${oId}`, name: `${o.name} Owner`, role: 'admin' },
+          { id: `demo_manager_${oId}`, name: 'Store Manager', role: 'manager' },
+          { id: `demo_biller_${oId}`, name: 'Cashier / Biller', role: 'biller' },
+          { id: `demo_captain_${oId}`, name: 'Floor Captain', role: 'captain' },
+          { id: `demo_cook_${oId}`, name: 'Kitchen Chef', role: 'cook' },
+        ];
+      }
+      return {
+        id: oId,
+        name: o.name,
+        city: o.address?.city || 'Main',
+        isSetupCompleted: Boolean(o.isSetupCompleted),
+        users: outletUsers,
+      };
+    });
+
+    return {
+      superAdmin: superAdminUser
+        ? {
+            id: superAdminUser._id.toString(),
+            name: superAdminUser.name,
+            role: 'super-admin',
+            email: superAdminUser.email,
+          }
+        : {
+            id: 'usr_super',
+            name: 'Platform Super Admin',
+            role: 'super-admin',
+            email: 'superadmin@pos.internal',
+          },
+      restaurants,
+    };
+  }
+
+  /* TEMPORARY_QUICK_LOGIN */
+  async quickLogin({ userId, outletId, role, ipAddress, userAgent }) {
+    let user = null;
+    let outlet = null;
+
+    if (mongoose.connection?.readyState === 1) {
+      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+        user = await User.findById(userId);
+      }
+      if (!user && role === 'super-admin') {
+        user = await User.findOne({ role: 'super-admin' });
+      }
+      if (!user && outletId && mongoose.Types.ObjectId.isValid(outletId)) {
+        user = await User.findOne({ outletId, role, isActive: true });
+      }
+      if (outletId && mongoose.Types.ObjectId.isValid(outletId)) {
+        outlet = await Outlet.findById(outletId).lean();
+      }
+    }
+
+    if (!user) {
+      const targetRole = role || 'admin';
+      user = {
+        _id: new mongoose.Types.ObjectId(),
+        name: targetRole === 'super-admin' ? 'Platform Super Admin' : `${targetRole.toUpperCase()} User`,
+        role: targetRole,
+        tenantId: outlet?.tenantId || new mongoose.Types.ObjectId(),
+        outletId: outletId && mongoose.Types.ObjectId.isValid(outletId) ? new mongoose.Types.ObjectId(outletId) : new mongoose.Types.ObjectId(),
+        email: `${targetRole}@pos.internal`,
+        phone: '9999999999',
+        isActive: true,
+        customPermissions: [],
+        maxDiscountPercent: 0,
+      };
+    }
+
+    const tokens = await this._generateTokens(user, { ipAddress, userAgent });
+
+    return {
+      user: this._sanitizeUser(user, outlet),
+      ...tokens,
+    };
+  }
 }

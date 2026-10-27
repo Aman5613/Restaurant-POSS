@@ -81,6 +81,32 @@ export class AuthController {
     });
   }
 
+  /* TEMPORARY_QUICK_LOGIN */
+  async quickLoginOptions(_request, reply) {
+    const data = await this.authService.getQuickLoginOptions();
+    return reply.send({ code: 'OK', ...data });
+  }
+
+  /* TEMPORARY_QUICK_LOGIN */
+  async quickLogin(request, reply) {
+    const { userId, outletId, role } = request.body || {};
+    const result = await this.authService.quickLogin({
+      userId,
+      outletId,
+      role,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+
+    this._setRefreshCookie(reply, result.refreshToken);
+
+    return reply.status(200).send({
+      code: 'LOGIN_SUCCESS',
+      user: result.user,
+      accessToken: result.accessToken,
+    });
+  }
+
   _setRefreshCookie(reply, token) {
     reply.setCookie('refreshToken', token, {
       path: '/',
