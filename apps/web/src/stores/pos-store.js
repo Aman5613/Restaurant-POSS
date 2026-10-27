@@ -537,7 +537,7 @@ export const usePosStore = create((set, get) => ({
       };
 
       const newTables = state.tables.map((t) => {
-        if (t.id === tableId) {
+        if (t.id === tableId || t._id === tableId) {
           return {
             ...t,
             status: isOccupied ? TABLE_STATUS.OCCUPIED : TABLE_STATUS.VACANT,
@@ -646,7 +646,7 @@ export const usePosStore = create((set, get) => ({
   markOrderBilled: (tableId) => {
     set((state) => {
       const newTables = state.tables.map((t) => {
-        if (t.id === tableId) {
+        if (t.id === tableId || t._id === tableId) {
           return { ...t, status: TABLE_STATUS.BILLED };
         }
         return t;
@@ -761,7 +761,7 @@ export const usePosStore = create((set, get) => ({
 
       // 2. Free the table (mark VACANT, reset runningAmount, reset order)
       const newTables = state.tables.map((t) => {
-        if (t.id === tableId) {
+        if (t.id === tableId || t._id === tableId) {
           return {
             ...t,
             status: TABLE_STATUS.VACANT,
@@ -778,6 +778,11 @@ export const usePosStore = create((set, get) => ({
       // 3. Clear active order for that table
       const newOrders = { ...state.orders };
       delete newOrders[tableId];
+      const matchedTbl = state.tables.find((t) => t.id === tableId || t._id === tableId);
+      if (matchedTbl) {
+        if (matchedTbl.id) delete newOrders[matchedTbl.id];
+        if (matchedTbl._id) delete newOrders[matchedTbl._id];
+      }
 
       // 4. Update or add customer if phone was provided
       const updatedCustomers = [...state.customers];

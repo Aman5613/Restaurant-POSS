@@ -215,8 +215,8 @@ export function useSocket() {
     }
 
     function onBillSettled(data) {
-      if (data?.tableId && data?.invoice) {
-        settleBillAndFreeTable(data.tableId, data.invoice);
+      if (data?.tableId) {
+        settleBillAndFreeTable(data.tableId, data.invoice || {});
       }
     }
 
@@ -362,6 +362,19 @@ export function useSocket() {
     [user?.outletId]
   );
 
+  const broadcastBillSettled = useCallback(
+    (tableId, invoice = {}) => {
+      if (socketInstance) {
+        socketInstance.emit(SOCKET_EVENTS.BILL_SETTLED, {
+          tableId,
+          invoice,
+          outletId: user?.outletId || 'default-outlet',
+        });
+      }
+    },
+    [user?.outletId]
+  );
+
   return {
     socket: socketInstance,
     isConnected,
@@ -374,6 +387,7 @@ export function useSocket() {
     markKotReady,
     broadcastTableUpdate,
     broadcastItem86,
+    broadcastBillSettled,
   };
 }
 

@@ -24,6 +24,7 @@ import { formatPaiseToRupees } from '@pos/shared';
 import { usePosStore } from '@/stores/pos-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiClient } from '@/lib/api-client';
+import { useSocket } from '@/hooks/use-socket';
 
 export function BillingPage() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ export function BillingPage() {
   const paramTableName = searchParams.get('tableName');
 
   const { getTableOrder, settleBillAndFreeTable, tables, outlet, setOutlet } = usePosStore();
+  const { broadcastBillSettled } = useSocket();
 
   const [paymentModesList, setPaymentModesList] = useState([]);
   const [taxGroup, setTaxGroup] = useState(null);
@@ -313,6 +315,16 @@ export function BillingPage() {
 
     // Free the table and store the invoice in posStore
     settleBillAndFreeTable(tableId, invoicePayload);
+
+    // Broadcast bill settlement to socket server & other devices
+    broadcastBillSettled(tableId, invoicePayload);
+
+    // Sync VACANT status to backend API if table exists in DB
+    const matchedTable = tables.find((t) => t.id === tableId || t._id === tableId);
+    const targetDbId = matchedTable?._id || (tableId && tableId.length === 24 ? tableId : null);
+    if (targetDbId) {
+      apiClient.post(`/v1/tables/${targetDbId}/status`, { status: 'VACANT' }).catch(() => {});
+    }
 
     try {
       localStorage.setItem('pos_last_settled_invoice', JSON.stringify(invoicePayload));
@@ -870,8 +882,9 @@ export function BillingPage() {
                   className="text-xs font-semibold"
                   onClick={() => {
                     setIsVoidOpen(false);
-                    // Free the table on void
-                    settleBillAndFreeTable(tableId, { invoiceNo: 'VOID-' + Date.now() });
+                    const voidPayload = { invoiceNo: 'VOID-' + Date.now() };
+                    settleBillAndFreeTable(tableId, voidPayload);
+                    broadcastBillSettled(tableId, voidPayload);
                     navigate('/tables');
                   }}
                 >
