@@ -4,6 +4,37 @@ A modern, high-performance, offline-first Restaurant Point of Sale (POS) and Man
 
 ---
 
+## screenshots
+- cashier/captain screen 
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/36400ec7-b1a3-424f-ba22-8c2f175a47ff" />
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/412f55c8-116d-48ab-8cfb-fb58ec74cc15" />
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/365ddaa9-40a2-4577-83a6-2b3b4b15d03f" />
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/bfcc65d0-80c3-410d-b96f-7758cb407c20" />
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/81526ae7-69f8-47ca-8e3b-98916b23e897" />
+
+  
+- cook/KDS screen : 
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d0743bd8-c755-42c0-a31f-aa61e0421109" />
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/01ff0643-5613-465e-afe6-927a8494fa5b" />
+
+- super-admin
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/dd2da3c8-c4a6-4308-8e0a-361caa204135" />
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/ecaeb9b1-49b0-4c04-861f-8d2f7e7b8284" />
+
+- Admin-screen
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/cc9d9d7d-a901-47e6-af1f-6800720cad75" />
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/e0c5b1a4-3c4b-4397-8e11-2846f2748841" />
+
+
+
+
+
+
+
+
+
+
+
 ## 🚀 Overview
 
 The **Restaurant POS** system is designed for restaurants, cafes, bars, and multi-chain food outlets. It supports end-to-end operations including floor plan management, live table tracking, multi-course KOT generation, real-time kitchen displays (KDS), split billing, multi-tender payments, shift reconciliation, and role-based access control.
